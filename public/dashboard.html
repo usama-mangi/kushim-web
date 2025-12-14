@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KUSHIM - Dashboard</title>
+    <style>
+        body { font-family: sans-serif; padding: 2rem; background-color: #f4f4f4; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .card { border: 1px solid #ddd; padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+        .score-box { text-align: center; font-size: 2rem; font-weight: bold; padding: 1rem; background: #e9ecef; border-radius: 4px; }
+        .verification-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; color: white; font-size: 0.8rem; vertical-align: middle; }
+        .gold { background-color: #ffd700; color: black; }
+        .silver { background-color: #c0c0c0; color: black; }
+        .bronze { background-color: #cd7f32; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+        th { background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Resilience Dashboard</h1>
+            <button onclick="logout()">Logout</button>
+        </div>
+
+        <div class="card">
+            <h3>Net Resilience Position (NRP)</h3>
+            <div class="score-box">
+                <span id="nrpScore">Loading...</span>
+                <span id="verificationBadge" class="verification-badge" style="display:none;"></span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Verified Claims</h3>
+            <table id="claimsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Period</th>
+                        <th>BU Value</th>
+                        <th>Level</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="5">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('kushim_token');
+        if (!token) window.location.href = '/index.html';
+
+        function logout() {
+            localStorage.removeItem('kushim_token');
+            window.location.href = '/index.html';
+        }
+
+        async function fetchWithAuth(url) {
+            const res = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.status === 401) logout();
+            return res.json();
+        }
+
+        async function loadData() {
+            // Load NRP Score
+            try {
+                const scoreData = await fetchWithAuth('/api/v1/nrp_score');
+                document.getElementById('nrpScore').textContent = scoreData.nrp_score.toFixed(2) + ' BU';
+                
+                const badge = document.getElementById('verificationBadge');
+                badge.textContent = scoreData.verification_level;
+                badge.className = 'verification-badge ' + scoreData.verification_level.toLowerCase();
+                badge.style.display = 'inline-block';
+            } catch (e) {
+                console.error(e);
+                document.getElementById('nrpScore').textContent = 'Error';
+            }
+
+            // Load Claims
+            try {
+                const claims = await fetchWithAuth('/api/v1/claims'); // We need to expose this route
+                const tbody = document.querySelector('#claimsTable tbody');
+                tbody.innerHTML = '';
+                
+                if (claims.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5">No claims found.</td></tr>';
+                    return;
+                }
+
+                claims.forEach(claim => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${claim.claim_id}</td>
+                        <td>${new Date(claim.period_start_date).toLocaleDateString()} - ${new Date(claim.period_end_date).toLocaleDateString()}</td>
+                        <td>${parseFloat(claim.barley_unit_value).toFixed(2)}</td>
+                        <td><span class="verification-badge ${claim.verification_level.toLowerCase()}">${claim.verification_level}</span></td>
+                        <td>${new Date(claim.created_at).toLocaleDateString()}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
