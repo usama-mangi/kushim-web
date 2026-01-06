@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Role {
+  id    String @id @default(uuid()) @db.Uuid
+  name  String @unique
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  roleId       String    @map("role_id") @db.Uuid
+  lastLogin    DateTime? @map("last_login")
+  
+  role         Role             @relation(fields: [roleId], references: [id])
+  dataSources  DataSource[]
+  records      UnifiedRecord[]
+
+  @@map("users")
+}
+
+model DataSource {
+  id                   String   @id @default(uuid()) @db.Uuid
+  userId               String   @map("user_id") @db.Uuid
+  providerName         String   @map("provider_name")
+  credentialsEncrypted Json     @map("credentials_encrypted")
+  status               String   @default("active")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  user                 User            @relation(fields: [userId], references: [id])
+  records              UnifiedRecord[]
+
+  @@map("data_sources")
+}
+
+model UnifiedRecord {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  sourceId String @map("source_id") @db.Uuid
+  payload  Json
+  checksum String @unique
+
+  user     User       @relation(fields: [userId], references: [id])
+  source   DataSource @relation(fields: [sourceId], references: [id])
+
+  @@index([userId, sourceId], name: "idx_records_user_source")
+  @@map("unified_records")
+}
