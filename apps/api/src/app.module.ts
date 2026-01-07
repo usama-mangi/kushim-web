@@ -6,9 +6,10 @@ import { UsersModule } from './users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { RecordsModule } from './records/records.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, PrismaModule, IngestionModule, NotificationsModule],
+  imports: [AuthModule, UsersModule, PrismaModule, IngestionModule, NotificationsModule, RecordsModule],
   controllers: [AppController],
   providers: [AppService],
 })

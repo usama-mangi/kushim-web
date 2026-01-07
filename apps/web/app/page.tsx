@@ -2,29 +2,76 @@
 
 import { useDashboardStore } from '@/store/useStore';
 import { useSocket } from '@/hooks/useSocket';
-import { useEffect } from 'react';
-import { LayoutDashboard, Database, RefreshCw, Activity } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { LayoutDashboard, Database, RefreshCw, Activity, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import axios from 'axios';
 
 export default function Home() {
   const { records, setRecords } = useDashboardStore();
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
   useSocket();
 
   useEffect(() => {
-    // Mock initial data fetch
-    setRecords([
-      { id: '1', payload: { name: 'Sample Repo', stars: 120 }, checksum: 'abc' },
-      { id: '2', payload: { name: 'Another Project', stars: 45 }, checksum: 'def' },
-    ]);
-  }, [setRecords]);
+    const token = localStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    const fetchRecords = async () => {
+      try {
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/records`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setRecords(response.data);
+      } catch (error) {
+        console.error('Failed to fetch records', error);
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          router.push('/login');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecords();
+  }, [router, setRecords]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    router.push('/login');
+  };
+
+  const handleSync = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/trigger/default-github-source`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert('Ingestion started! Watch for updates.');
+    } catch (error) {
+      console.error('Sync failed', error);
+      alert('Failed to trigger sync.');
+    }
+  };
+
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center bg-gray-50">Loading...</div>;
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200">
+      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-6">
           <h1 className="text-2xl font-bold text-indigo-600">Kushim</h1>
         </div>
-        <nav className="mt-6">
+        <nav className="flex-1 mt-6">
           <a href="#" className="flex items-center px-6 py-3 text-gray-700 bg-gray-100 border-r-4 border-indigo-600">
             <LayoutDashboard className="w-5 h-5 mr-3" />
             Dashboard
@@ -38,13 +85,25 @@ export default function Home() {
             Activity
           </a>
         </nav>
+        <div className="p-4 border-t border-gray-200">
+          <button 
+            onClick={handleLogout}
+            className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+          >
+            <LogOut className="w-5 h-5 mr-3" />
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8">
           <h2 className="text-xl font-semibold text-gray-800">Unified Dashboard</h2>
-          <button className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">
+          <button 
+            onClick={handleSync}
+            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+          >
             <RefreshCw className="w-4 h-4 mr-2" />
             Sync Now
           </button>
@@ -81,14 +140,22 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {records.map((record) => (
-                    <tr key={record.id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 text-sm text-gray-600">{record.id}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{record.payload.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{record.payload.stars}</td>
-                      <td className="px-6 py-4 text-sm text-gray-400 font-mono truncate max-w-[100px]">{record.checksum}</td>
+                  {records.length > 0 ? (
+                    records.map((record) => (
+                      <tr key={record.id} className="hover:bg-gray-50 transition">
+                        <td className="px-6 py-4 text-sm text-gray-600">{record.id.slice(0, 8)}...</td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{record.payload.name || 'N/A'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{record.payload.metadata?.stars || record.payload.stars || 0}</td>
+                        <td className="px-6 py-4 text-sm text-gray-400 font-mono truncate max-w-[100px]">{record.checksum}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                        No records found. Click "Sync Now" to start ingestion.
+                      </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
