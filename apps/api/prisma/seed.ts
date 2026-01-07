@@ -40,18 +40,19 @@ async function main() {
     console.log('Seed: Admin user initialized (admin@kushim.com / admin123).');
 
     // 3. Create Default Data Source (GitHub)
+    const dataSourceId = '11111111-1111-1111-1111-111111111111';
     await prisma.dataSource.upsert({
-      where: { id: 'default-github-source' }, // specific UUID for stability
+      where: { id: dataSourceId },
       update: {},
       create: {
-        id: 'default-github-source',
+        id: dataSourceId,
         userId: adminUser.id,
         providerName: 'github',
         credentialsEncrypted: {}, // Empty for mock adapter
         status: 'active',
       },
     });
-    console.log('Seed: Default GitHub data source initialized.');
+    console.log(`Seed: Default GitHub data source initialized (${dataSourceId}).`);
   }
 }
 

@@ -49,7 +49,7 @@ export default function Home() {
     try {
       const token = localStorage.getItem('token');
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/trigger/default-github-source`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/trigger/11111111-1111-1111-1111-111111111111`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
