@@ -3,7 +3,7 @@
 import { useDashboardStore } from '@/store/useStore';
 import { useSocket } from '@/hooks/useSocket';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Database, RefreshCw, Activity, LogOut } from 'lucide-react';
+import { LayoutDashboard, Database, RefreshCw, Activity, LogOut, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
@@ -91,6 +91,10 @@ export default function Home() {
           <a href="/activity" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
             <Activity className="w-5 h-5 mr-3" />
             Activity
+          </a>
+          <a href="/mfa/setup" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
+            <Shield className="w-5 h-5 mr-3" />
+            Security
           </a>
         </nav>
         <div className="p-4 border-t border-gray-200">

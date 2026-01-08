@@ -23,6 +23,8 @@ model User {
   passwordHash String    @map("password_hash")
   roleId       String    @map("role_id") @db.Uuid
   lastLogin    DateTime? @map("last_login")
+  mfaSecret    String?   @map("mfa_secret")
+  mfaEnabled   Boolean   @default(false) @map("mfa_enabled")
   
   role         Role             @relation(fields: [roleId], references: [id])
   dataSources  DataSource[]
