@@ -40,19 +40,48 @@ async function main() {
     console.log('Seed: Admin user initialized (admin@kushim.com / admin123).');
 
     // 3. Create Default Data Source (GitHub)
-    const dataSourceId = '11111111-1111-1111-1111-111111111111';
+    const githubId = '11111111-1111-1111-1111-111111111111';
     await prisma.dataSource.upsert({
-      where: { id: dataSourceId },
+      where: { id: githubId },
       update: {},
       create: {
-        id: dataSourceId,
+        id: githubId,
         userId: adminUser.id,
         providerName: 'github',
-        credentialsEncrypted: {}, // Empty for mock adapter
+        credentialsEncrypted: {},
         status: 'active',
       },
     });
-    console.log(`Seed: Default GitHub data source initialized (${dataSourceId}).`);
+
+    // 4. Create Default Data Source (Jira)
+    const jiraId = '22222222-2222-2222-2222-222222222222';
+    await prisma.dataSource.upsert({
+      where: { id: jiraId },
+      update: {},
+      create: {
+        id: jiraId,
+        userId: adminUser.id,
+        providerName: 'jira',
+        credentialsEncrypted: {},
+        status: 'active',
+      },
+    });
+
+    // 5. Create Default Data Source (Slack)
+    const slackId = '33333333-3333-3333-3333-333333333333';
+    await prisma.dataSource.upsert({
+      where: { id: slackId },
+      update: {},
+      create: {
+        id: slackId,
+        userId: adminUser.id,
+        providerName: 'slack',
+        credentialsEncrypted: {},
+        status: 'active',
+      },
+    });
+
+    console.log(`Seed: Data sources initialized (GitHub: ${githubId}, Jira: ${jiraId}, Slack: ${slackId}).`);
   }
 }
 
