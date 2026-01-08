@@ -27,6 +27,7 @@ model User {
   role         Role             @relation(fields: [roleId], references: [id])
   dataSources  DataSource[]
   records      UnifiedRecord[]
+  activityLogs ActivityLog[]
 
   @@map("users")
 }
@@ -57,4 +58,19 @@ model UnifiedRecord {
 
   @@index([userId, sourceId], name: "idx_records_user_source")
   @@map("unified_records")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String
+  resource  String
+  payload   Json?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([createdAt(sort: Desc)], name: "idx_audit_created")
+  @@map("activity_logs")
 }

@@ -2,13 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GithubAdapter } from './adapters/github.adapter';
 import { BaseAdapter } from './adapters/base.adapter';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class IngestionService {
   private readonly logger = new Logger(IngestionService.name);
   private adapters: Map<string, BaseAdapter> = new Map();
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private notificationsGateway: NotificationsGateway,
+  ) {
     this.adapters.set('github', new GithubAdapter());
   }
 
@@ -34,7 +38,7 @@ export class IngestionService {
     for (const raw of rawData) {
       const normalized = adapter.normalize(raw);
       
-      await this.prisma.unifiedRecord.upsert({
+      const record = await this.prisma.unifiedRecord.upsert({
         where: { checksum: normalized.checksum },
         update: {
           payload: normalized.payload,
@@ -46,6 +50,8 @@ export class IngestionService {
           checksum: normalized.checksum,
         },
       });
+
+      this.notificationsGateway.broadcast('recordUpdated', record);
     }
 
     this.logger.log(`Ingestion completed for ${dataSource.providerName}`);

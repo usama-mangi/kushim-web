@@ -11,6 +11,7 @@ export default function Home() {
   const { records, setRecords } = useDashboardStore();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [activeSourcesCount, setActiveSourcesCount] = useState(0);
 
   useSocket();
 
@@ -21,14 +22,21 @@ export default function Home() {
       return;
     }
 
-    const fetchRecords = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/records`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setRecords(response.data);
+        const [recordsRes, sourcesRes] = await Promise.all([
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/records`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/sources`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        ]);
+        
+        setRecords(recordsRes.data);
+        setActiveSourcesCount(sourcesRes.data.length);
       } catch (error) {
-        console.error('Failed to fetch records', error);
+        console.error('Failed to fetch data', error);
         if (axios.isAxiosError(error) && error.response?.status === 401) {
           router.push('/login');
         }
@@ -37,7 +45,7 @@ export default function Home() {
       }
     };
 
-    fetchRecords();
+    fetchData();
   }, [router, setRecords]);
 
   const handleLogout = () => {
@@ -80,7 +88,7 @@ export default function Home() {
             <Database className="w-5 h-5 mr-3" />
             Sources
           </a>
-          <a href="#" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
+          <a href="/activity" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
             <Activity className="w-5 h-5 mr-3" />
             Activity
           </a>
@@ -117,7 +125,7 @@ export default function Home() {
             </div>
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
               <p className="text-sm text-gray-500 mb-1">Active Sources</p>
-              <p className="text-3xl font-bold text-gray-900">1</p>
+              <p className="text-3xl font-bold text-gray-900">{activeSourcesCount}</p>
             </div>
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
               <p className="text-sm text-gray-500 mb-1">System Health</p>
