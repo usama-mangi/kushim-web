@@ -9,6 +9,7 @@ export default function MfaSetupPage() {
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isEnabled, setIsEnabled] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -20,14 +21,25 @@ export default function MfaSetupPage() {
           return;
         }
 
-        const response = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/mfa/generate`,
-          {},
+        // Check status first
+        const statusRes = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/mfa/status`,
           { headers: { Authorization: `Bearer ${authToken}` } }
         );
-        setQrCodeUrl(response.data.qrCodeUrl);
+
+        if (statusRes.data.enabled) {
+          setIsEnabled(true);
+        } else {
+          // If not enabled, generate new secret
+          const response = await axios.post(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/mfa/generate`,
+            {},
+            { headers: { Authorization: `Bearer ${authToken}` } }
+          );
+          setQrCodeUrl(response.data.qrCodeUrl);
+        }
       } catch (error) {
-        console.error('Failed to generate MFA secret', error);
+        console.error('Failed to init MFA', error);
       } finally {
         setLoading(false);
       }
@@ -52,6 +64,28 @@ export default function MfaSetupPage() {
 
   if (loading) {
     return <div className="flex h-screen items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-indigo-600" /></div>;
+  }
+
+  if (isEnabled) {
+    return (
+      <div className="flex h-screen bg-gray-50 items-center justify-center">
+        <div className="w-full max-w-md bg-white p-8 rounded-xl border border-gray-200 shadow-sm text-center">
+          <div className="flex justify-center mb-4">
+            <div className="p-3 bg-green-100 rounded-full">
+              <ShieldCheck className="w-8 h-8 text-green-600" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">MFA is Active</h2>
+          <p className="text-gray-500 mb-6">Your account is secured with Two-Factor Authentication.</p>
+          <button
+            onClick={() => router.push('/')}
+            className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition font-medium"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

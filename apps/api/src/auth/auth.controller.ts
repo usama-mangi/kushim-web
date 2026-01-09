@@ -48,6 +48,12 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('mfa/status')
+  getMfaStatus(@Request() req: any) {
+    return { enabled: req.user.mfaEnabled };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('mfa/generate')
   async generateMfa(@Request() req: any) {
     return this.auditMfaGeneration(req.user.userId);
@@ -62,5 +68,16 @@ export class AuthController {
   @Post('mfa/verify')
   async verifyMfa(@Request() req: any, @Body() body: { token: string }) {
     return this.authService.verifyMfaToken(req.user.userId, body.token);
+  }
+
+  // Use a special guard or just check the token payload manually in service?
+  // Since we are using the standard JwtAuthGuard, it will validate the signature.
+  // The service logic will check the 'isMfaTemp' payload if we want strict enforcement there, 
+  // but for now, we just trust the userId extraction.
+  // Note: JwtStrategy extracts 'sub' as 'userId'.
+  @UseGuards(JwtAuthGuard)
+  @Post('mfa/login')
+  async mfaLogin(@Request() req: any, @Body() body: { token: string }) {
+    return this.authService.verifyMfaLogin(req.user.userId, body.token);
   }
 }

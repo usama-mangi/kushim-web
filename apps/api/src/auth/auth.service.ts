@@ -25,13 +25,15 @@ export class AuthService {
 
   async login(user: any) {
     if (user.mfaEnabled) {
-      // If MFA is enabled, return a partial token or flag to prompt for OTP
-      // For simplicity in this iteration, we return a temp token with 'is2fa: true' claim
-      // Or we can just handle it in the frontend. 
-      // A better flow: return { mfaRequired: true, tempToken: ... }
-      // But adhering to standard JWT, we'll just sign it. 
-      // Ideally, you'd check the OTP *before* issuing the full access token.
+      // Return a temporary token that is only valid for MFA verification
+      const payload = { sub: user.id, isMfaTemp: true };
+      return {
+        mfaRequired: true,
+        temp_token: this.jwtService.sign(payload, { expiresIn: '5m' }), // Short lived
+      };
     }
+    
+    // Standard login for non-MFA users
     const payload = { email: user.email, sub: user.id, role: user.role.name };
     return {
       access_token: this.jwtService.sign(payload),
@@ -39,6 +41,37 @@ export class AuthService {
         id: user.id,
         email: user.email,
         mfaEnabled: user.mfaEnabled,
+      },
+    };
+  }
+
+  async verifyMfaLogin(userId: string, token: string) {
+    const user = await this.prisma.user.findUnique({ 
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    if (!user || !user.mfaEnabled || !user.mfaSecret) {
+      throw new UnauthorizedException('MFA not enabled for this user');
+    }
+
+    const isValid = authenticator.verify({
+      token,
+      secret: user.mfaSecret,
+    });
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid OTP code');
+    }
+
+    // Issue full access token
+    const payload = { email: user.email, sub: user.id, role: user.role.name };
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        email: user.email,
+        mfaEnabled: true,
       },
     };
   }

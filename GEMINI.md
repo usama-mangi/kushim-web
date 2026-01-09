@@ -1,46 +1,50 @@
-# GEMINI.md: Production Implementation Protocol
+# GEMINI.md: Production Implementation Protocol (Hardening & Scale)
 
 ## 1. Role & Context
-You are the Lead Implementation Engineer for **Project Kushim**. Your goal is to build a production-ready system based on the specifications in the `/docs` folder (PRD, SRS, SAD, Schema, API, EDD).
+You are the Lead Implementation Engineer for **Project Kushim**. Having completed the initial prototype, your goal is now to harden the system for enterprise-grade production use (High Availability, Security, Observability, and Scalability).
 
 ## 2. Iterative Workflow
-1. **Contextual Review:** Read the relevant documentation.
-2. **Implementation:** Write production-grade code.
-3. **Verification:** Self-check and manual verification.
-4. **Commit & Transition:** Finalize and move to next.
+1. **Contextual Review:** Analyze existing prototype code and identified production gaps.
+2. **Implementation:** Write production-grade, hardened code.
+3. **Verification:** Automated tests (Unit/E2E) and manual verification.
+4. **Commit & Transition:** Finalize and move to the next task.
 
-## 3. Implementation Roadmap
+## 3. Production Roadmap
 
-### Phase 1: Foundation & IAM (Identity & Access Management)
-- [x] **F1.1: Project Scaffolding.** Setup Next.js, NestJS, Tailwind, and Docker Compose. (DONE)
-- [x] **F1.2: Database Migration.** Execute the SQL schema for `roles` and `users`. (DONE)
-- [x] **F1.3: Authentication Engine.** Implement Argon2 hashing, JWT strategy, and Passport.js. (DONE)
-- [x] **F1.4: RBAC Guard.** Middleware to enforce role-based permissions on API routes. (DONE)
+### Phase 5: Backend Hardening (Security & Reliability)
+- [ ] **F5.1: Rate Limiting.** Implement `ThrottlerModule` with Redis to prevent API abuse.
+- [ ] **F5.2: Refresh Token Rotation.** Move JWTs to HttpOnly cookies and implement rotation logic.
+- [ ] **F5.3: Redis WebSocker Adapter.** Enable multi-instance Socket.io synchronization.
+- [ ] **F5.4: Dead Letter Queues (DLQ).** Configure BullMQ error handling and recovery strategies.
 
-### Phase 2: Data Aggregation Engine
-- [x] **F2.1: Adapter Interface.** Define the abstract class and normalization logic. (DONE)
-- [x] **F2.2: Infrastructure (Queue).** Setup Redis and BullMQ worker. (DONE)
-- [x] **F2.3: First Integration.** Implement the GitHub or Jira adapter as a reference. (DONE)
-- [x] **F2.4: Persistence Logic.** Implement the UPSERT logic with SHA-256 checksums. (DONE)
+### Phase 6: Frontend Optimization & Resilience
+- [ ] **F6.1: Hydration & SSR.** Pre-fetch dashboard data using Next.js Server Components.
+- [ ] **F6.2: Error Boundaries & Sentry.** Implement granular error handling and crash reporting.
+- [ ] **F6.3: List Virtualization.** Use `tanstack-virtual` for high-volume record rendering.
+- [ ] **F6.4: Optimistic UI.** Update global state immediately on sync/edit actions.
 
-### Phase 3: Real-Time & Frontend UI
-- [x] **F3.1: WebSocket Gateway.** NestJS Socket.io gateway with Redis Pub/Sub. (DONE)
-- [x] **F3.2: Global State.** Setup Zustand/TanStack Query in the frontend. (DONE)
-- [x] **F3.3: Unified Dashboard.** Build the main UI to display aggregated records. (DONE)
-- [x] **F3.4: Real-time Updates.** Connect the frontend to the WebSocket gateway. (DONE)
+### Phase 7: DevOps & CI/CD (Automation)
+- [ ] **F7.1: Pipeline Engineering.** GitHub Actions for linting, testing, and Docker builds.
+- [ ] **F7.2: Security Scans.** Integrate `trivy` or `snyk` into the build pipeline.
+- [ ] **F7.3: Kubernetes Manifests.** Define Helm charts for RDS, EKS, and ElastiCache.
+- [ ] **F7.4: Migration Jobs.** Create standalone k8s jobs for Prisma schema updates.
 
-### Phase 4: Audit System & Enhanced Security
-- [ ] **F4.1: Audit Logging.** Implement a global interceptor to log all data access and mutations.
-- [ ] **F4.2: Audit UI.** Dashboard view for administrators to track system activity.
-- [ ] **F4.3: MFA (Totp).** Implement Two-Factor Authentication using speakeasy/otplib.
-- [ ] **F4.4: OAuth2 Integration.** Support GitHub/Google login providers.
+### Phase 8: Observability (The Eyes)
+- [ ] **F8.1: Structured Logging.** Replace console logs with Winston/Pino JSON logging.
+- [ ] **F8.2: Metrics (Prometheus).** Expose application performance metrics.
+- [ ] **F8.3: Distributed Tracing.** Instrument services with OpenTelemetry.
 
-## 4. Execution Commands
+### Phase 9: Quality Assurance & Docs
+- [ ] **F9.1: Swagger/OpenAPI.** Auto-generate and host API documentation.
+- [ ] **F9.2: E2E Testing.** Implement Playwright/Cypress flows for core user journeys.
+- [ ] **F9.3: Load Testing.** Verify the 500 RPS requirement via k6 or Locust.
+
+## 4. Current Status
+- **Current Feature:** F5.1 Rate Limiting
+- **Last Commit:** 6ad6b23
+- **Blockers:** None
+
+## 5. Execution Commands
 - `"Initiate Feature [ID]"` -> Start the implementation.
 - `"Verify Feature [ID]"` -> Request manual verification from user.
 - `"Commit Feature [ID]"` -> Finalize and move to next.
-
-## 5. Current Status
-- **Current Feature:** F4.1 Audit Logging
-- **Last Commit:** 8f481cd
-- **Blockers:** None
