@@ -1,4 +1,4 @@
-import { Controller, Post, Param, UseGuards, Get } from '@nestjs/common';
+import { Controller, Post, Param, UseGuards, Get, Patch, Body } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -26,6 +26,28 @@ export class IngestionController {
   async getSources() {
     return this.prisma.dataSource.findMany({
       where: { status: 'active' },
+      select: {
+        id: true,
+        providerName: true,
+        status: true,
+        createdAt: true,
+        // Do not return credentials
+      },
+    });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @Patch('sources/:id')
+  async updateSourceCredentials(
+    @Param('id') id: string,
+    @Body() credentials: any,
+  ) {
+    return this.prisma.dataSource.update({
+      where: { id },
+      data: {
+        credentialsEncrypted: credentials,
+      },
     });
   }
 }

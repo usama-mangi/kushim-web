@@ -58,13 +58,17 @@ export default function ActivityPage() {
             <LayoutDashboard className="w-5 h-5 mr-3" />
             Dashboard
           </a>
-          <a href="#" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
+          <a href="/sources" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
             <Database className="w-5 h-5 mr-3" />
             Sources
           </a>
           <a href="/activity" className="flex items-center px-6 py-3 text-gray-700 bg-gray-100 border-r-4 border-indigo-600">
             <ActivityIcon className="w-5 h-5 mr-3" />
             Activity
+          </a>
+          <a href="/mfa/setup" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
+            <Shield className="w-5 h-5 mr-3" />
+            Security
           </a>
         </nav>
         <div className="p-4 border-t border-gray-200">
