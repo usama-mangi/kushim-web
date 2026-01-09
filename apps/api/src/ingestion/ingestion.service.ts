@@ -6,6 +6,7 @@ import { SlackAdapter } from './adapters/slack.adapter';
 import { BaseAdapter } from './adapters/base.adapter';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { EncryptionService } from '../common/encryption.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class IngestionService {
@@ -16,6 +17,7 @@ export class IngestionService {
     private prisma: PrismaService,
     private notificationsGateway: NotificationsGateway,
     private encryptionService: EncryptionService,
+    private auditService: AuditService,
   ) {
     this.adapters.set('github', new GithubAdapter());
     this.adapters.set('jira', new JiraAdapter());
@@ -38,41 +40,77 @@ export class IngestionService {
     }
 
     this.logger.log(`Starting ingestion for ${dataSource.providerName} (User: ${dataSource.userId})`);
+    
+    // Log start
+    await this.auditService.log({
+      userId: dataSource.userId,
+      action: 'SYNC_START',
+      resource: `source/${dataSource.providerName}`,
+      payload: { sourceId: dataSourceId },
+    });
 
     let credentials = dataSource.credentialsEncrypted;
     
     // Check if it's encrypted (has _encrypted property) and decrypt
-    // We handle both legacy (plain JSON) and new (encrypted) for backward compatibility during migration
     if (credentials && typeof credentials === 'object' && !Array.isArray(credentials) && '_encrypted' in credentials) {
       try {
         credentials = await this.encryptionService.decryptObject(credentials);
       } catch (err) {
-        this.logger.error(`Failed to decrypt credentials for source ${dataSourceId}`, err);
-        throw new Error('Credential decryption failed');
+        const errorMsg = 'Credential decryption failed';
+        this.logger.error(errorMsg, err);
+        await this.auditService.log({
+          userId: dataSource.userId,
+          action: 'SYNC_FAIL',
+          resource: `source/${dataSource.providerName}`,
+          payload: { error: errorMsg },
+        });
+        throw new Error(errorMsg);
       }
     }
 
-    const rawData = await adapter.fetch(credentials);
-    
-    for (const raw of rawData) {
-      const normalized = adapter.normalize(raw);
+    try {
+      const rawData = await adapter.fetch(credentials);
+      let newCount = 0;
       
-      const record = await this.prisma.unifiedRecord.upsert({
-        where: { checksum: normalized.checksum },
-        update: {
-          payload: normalized.payload,
-        },
-        create: {
-          userId: dataSource.userId,
-          sourceId: dataSource.id,
-          payload: normalized.payload,
-          checksum: normalized.checksum,
-        },
+      for (const raw of rawData) {
+        const normalized = adapter.normalize(raw);
+        
+        const record = await this.prisma.unifiedRecord.upsert({
+          where: { checksum: normalized.checksum },
+          update: {
+            payload: normalized.payload,
+          },
+          create: {
+            userId: dataSource.userId,
+            sourceId: dataSource.id,
+            payload: normalized.payload,
+            checksum: normalized.checksum,
+          },
+        });
+
+        this.notificationsGateway.broadcast('recordUpdated', record);
+        newCount++;
+      }
+
+      this.logger.log(`Ingestion completed for ${dataSource.providerName}. Records: ${newCount}`);
+      
+      await this.auditService.log({
+        userId: dataSource.userId,
+        action: 'SYNC_COMPLETE',
+        resource: `source/${dataSource.providerName}`,
+        payload: { count: newCount },
       });
 
-      this.notificationsGateway.broadcast('recordUpdated', record);
+    } catch (error) {
+      this.logger.error(`Ingestion failed for ${dataSource.providerName}`, error);
+      
+      await this.auditService.log({
+        userId: dataSource.userId,
+        action: 'SYNC_FAIL',
+        resource: `source/${dataSource.providerName}`,
+        payload: { error: error.message },
+      });
+      throw error;
     }
-
-    this.logger.log(`Ingestion completed for ${dataSource.providerName}`);
   }
 }

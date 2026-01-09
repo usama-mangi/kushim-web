@@ -6,10 +6,12 @@ import { IngestionProcessor } from './ingestion.processor';
 import { IngestionController } from './ingestion.controller';
 import { SyncSchedulerService } from './sync-scheduler.service';
 import { CommonModule } from '../common/common.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
     CommonModule,
+    AuditModule,
     ScheduleModule.forRoot(),
     BullModule.forRoot({
       connection: {
