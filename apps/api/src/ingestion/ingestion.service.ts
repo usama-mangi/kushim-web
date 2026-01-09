@@ -5,6 +5,7 @@ import { JiraAdapter } from './adapters/jira.adapter';
 import { SlackAdapter } from './adapters/slack.adapter';
 import { BaseAdapter } from './adapters/base.adapter';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { EncryptionService } from '../common/encryption.service';
 
 @Injectable()
 export class IngestionService {
@@ -14,6 +15,7 @@ export class IngestionService {
   constructor(
     private prisma: PrismaService,
     private notificationsGateway: NotificationsGateway,
+    private encryptionService: EncryptionService,
   ) {
     this.adapters.set('github', new GithubAdapter());
     this.adapters.set('jira', new JiraAdapter());
@@ -37,7 +39,20 @@ export class IngestionService {
 
     this.logger.log(`Starting ingestion for ${dataSource.providerName} (User: ${dataSource.userId})`);
 
-    const rawData = await adapter.fetch(dataSource.credentialsEncrypted);
+    let credentials = dataSource.credentialsEncrypted;
+    
+    // Check if it's encrypted (has _encrypted property) and decrypt
+    // We handle both legacy (plain JSON) and new (encrypted) for backward compatibility during migration
+    if (credentials && typeof credentials === 'object' && !Array.isArray(credentials) && '_encrypted' in credentials) {
+      try {
+        credentials = await this.encryptionService.decryptObject(credentials);
+      } catch (err) {
+        this.logger.error(`Failed to decrypt credentials for source ${dataSourceId}`, err);
+        throw new Error('Credential decryption failed');
+      }
+    }
+
+    const rawData = await adapter.fetch(credentials);
     
     for (const raw of rawData) {
       const normalized = adapter.normalize(raw);

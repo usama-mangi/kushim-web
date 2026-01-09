@@ -5,12 +5,14 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { EncryptionService } from '../common/encryption.service';
 
 @Controller('ingestion')
 export class IngestionController {
   constructor(
     @InjectQueue('ingestion') private ingestionQueue: Queue,
     private prisma: PrismaService,
+    private encryptionService: EncryptionService,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -43,10 +45,11 @@ export class IngestionController {
     @Param('id') id: string,
     @Body() credentials: any,
   ) {
+    const encryptedCredentials = await this.encryptionService.encryptObject(credentials);
     return this.prisma.dataSource.update({
       where: { id },
       data: {
-        credentialsEncrypted: credentials,
+        credentialsEncrypted: encryptedCredentials,
       },
     });
   }

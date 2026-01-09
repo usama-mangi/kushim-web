@@ -10,9 +10,11 @@ import { RecordsModule } from './records/records.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
 import { AuditInterceptor } from './audit/audit.interceptor';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
+    CommonModule,
     AuthModule,
     UsersModule,
     PrismaModule,
