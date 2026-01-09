@@ -76,6 +76,11 @@ export class AuthService {
     };
   }
 
+  async getMfaStatus(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    return { enabled: !!user?.mfaEnabled };
+  }
+
   async generateMfaSecret(userId: string) {
     const secret = authenticator.generateSecret();
     const user = await this.prisma.user.findUnique({ where: { id: userId } });

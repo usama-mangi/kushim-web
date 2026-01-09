@@ -49,8 +49,8 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('mfa/status')
-  getMfaStatus(@Request() req: any) {
-    return { enabled: req.user.mfaEnabled };
+  async getMfaStatus(@Request() req: any) {
+    return this.authService.getMfaStatus(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
