@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
-import { LayoutDashboard, Database, Activity, LogOut, Shield, Key } from 'lucide-react';
+import { LayoutDashboard, Database, Activity, LogOut, Shield, Key, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function SourcesPage() {
   const [sources, setSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<any>({});
+  const [showHelp, setShowHelp] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function SourcesPage() {
   const startEditing = (source: any) => {
     setEditingId(source.id);
     setFormData({}); // Reset form
+    setShowHelp(null);
   };
 
   const handleSave = async (sourceId: string) => {
@@ -58,6 +60,14 @@ export default function SourcesPage() {
     } catch (error) {
       console.error('Failed to update credentials', error);
       alert('Failed to update credentials');
+    }
+  };
+
+  const toggleHelp = (provider: string) => {
+    if (showHelp === provider) {
+      setShowHelp(null);
+    } else {
+      setShowHelp(provider);
     }
   };
 
@@ -107,7 +117,7 @@ export default function SourcesPage() {
         <main className="flex-1 overflow-y-auto p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sources.map((source) => (
-              <div key={source.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+              <div key={source.id} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex flex-col">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-lg font-bold capitalize">{source.providerName}</h3>
@@ -119,11 +129,50 @@ export default function SourcesPage() {
                 </div>
 
                 {editingId === source.id ? (
-                  <div className="space-y-3 mt-4">
+                  <div className="space-y-3 mt-4 flex-1">
+                    <button 
+                      onClick={() => toggleHelp(source.providerName)}
+                      className="text-xs text-indigo-600 flex items-center hover:underline mb-2"
+                    >
+                      <HelpCircle className="w-3 h-3 mr-1" />
+                      How to get these credentials?
+                      {showHelp === source.providerName ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+                    </button>
+
+                    {showHelp === source.providerName && (
+                      <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-800 space-y-2 mb-3">
+                        {source.providerName === 'github' && (
+                          <ol className="list-decimal pl-4 space-y-1">
+                            <li>Go to <strong>GitHub Settings</strong> {'>'} Developer settings.</li>
+                            <li>Select <strong>Personal access tokens</strong> {'>'} Tokens (classic).</li>
+                            <li>Generate new token. Select <code>repo</code> scope.</li>
+                            <li>Copy the token starting with <code>ghp_</code>.</li>
+                          </ol>
+                        )}
+                        {source.providerName === 'jira' && (
+                          <ol className="list-decimal pl-4 space-y-1">
+                            <li>Go to <strong>id.atlassian.com</strong> {'>'} Security {'>'} API tokens.</li>
+                            <li>Create and label a new API token.</li>
+                            <li>Copy the token.</li>
+                            <li><strong>Host:</strong> Your Jira URL (e.g., https://acme.atlassian.net).</li>
+                          </ol>
+                        )}
+                        {source.providerName === 'slack' && (
+                          <ol className="list-decimal pl-4 space-y-1">
+                            <li>Create a new App at <strong>api.slack.com/apps</strong>.</li>
+                            <li>Go to <strong>OAuth & Permissions</strong>.</li>
+                            <li>Add User Scope: <code>stars:read</code>.</li>
+                            <li>Install to Workspace.</li>
+                            <li>Copy <strong>User OAuth Token</strong> (starts with <code>xoxp-</code>).</li>
+                          </ol>
+                        )}
+                      </div>
+                    )}
+
                     {source.providerName === 'github' && (
                       <input
                         type="password"
-                        placeholder="Personal Access Token"
+                        placeholder="Personal Access Token (ghp_...)"
                         className="w-full px-3 py-2 border rounded-lg text-sm"
                         onChange={(e) => setFormData({ ...formData, token: e.target.value })}
                       />
@@ -158,16 +207,18 @@ export default function SourcesPage() {
                         />
                       </>
                     )}
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 pt-2">
                       <button onClick={() => handleSave(source.id)} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm hover:bg-indigo-700">Save</button>
                       <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-200">Cancel</button>
                     </div>
                   </div>
                 ) : (
-                  <button onClick={() => startEditing(source)} className="w-full mt-4 flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-                    <Key className="w-4 h-4 mr-2" />
-                    Edit Credentials
-                  </button>
+                  <div className="mt-auto">
+                    <button onClick={() => startEditing(source)} className="w-full mt-4 flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                      <Key className="w-4 h-4 mr-2" />
+                      Edit Credentials
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
