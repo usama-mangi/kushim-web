@@ -1,11 +1,16 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 import { IngestionService } from './ingestion.service';
 import { IngestionProcessor } from './ingestion.processor';
 import { IngestionController } from './ingestion.controller';
+import { SyncSchedulerService } from './sync-scheduler.service';
+import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
+    CommonModule,
+    ScheduleModule.forRoot(),
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
@@ -16,7 +21,7 @@ import { IngestionController } from './ingestion.controller';
       name: 'ingestion',
     }),
   ],
-  providers: [IngestionService, IngestionProcessor],
+  providers: [IngestionService, IngestionProcessor, SyncSchedulerService],
   controllers: [IngestionController],
   exports: [IngestionService],
 })
