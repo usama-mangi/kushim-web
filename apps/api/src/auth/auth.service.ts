@@ -83,4 +83,17 @@ export class AuthService {
       throw new UnauthorizedException('Invalid OTP token');
     }
   }
+
+  async validateOrCreateSocialUser(email: string, provider: string) {
+    let user = await this.usersService.findOne(email);
+    
+    if (!user) {
+      // Create new user with random password
+      const randomPassword = Math.random().toString(36).slice(-8);
+      // Default to USER role
+      user = await this.usersService.create(email, randomPassword, 'USER');
+    }
+
+    return user;
+  }
 }
