@@ -29,6 +29,7 @@ export class UsersService {
         passwordHash,
         roleId: role.id,
       },
+      include: { role: true },
     });
   }
 }

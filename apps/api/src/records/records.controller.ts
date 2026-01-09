@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Query } from '@nestjs/common';
 import { RecordsService } from './records.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -8,7 +8,10 @@ export class RecordsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  findAll() {
-    return this.recordsService.findAll();
+  findAll(
+    @Query('search') search?: string,
+    @Query('source') source?: string,
+  ) {
+    return this.recordsService.findAll({ search, source });
   }
 }
