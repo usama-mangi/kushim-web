@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Lock, Mail, Github, Chrome } from 'lucide-react';
+import Link from 'next/link';
 
 function LoginContent() {
   const [email, setEmail] = useState('');
@@ -113,6 +114,14 @@ function LoginContent() {
             >
               Sign In
             </button>
+            <div className="flex items-center justify-between mt-2">
+              <Link href="/signup" className="text-sm text-indigo-600 hover:underline">
+                Create account
+              </Link>
+              <Link href="/forgot-password" resentment className="text-sm text-gray-500 hover:underline">
+                Forgot password?
+              </Link>
+            </div>
           </form>
         ) : (
           <form onSubmit={handleMfaSubmit} className="space-y-6">

@@ -134,4 +134,27 @@ export class AuthService {
 
     return user;
   }
+
+  async register(email: string, pass: string) {
+    const existing = await this.usersService.findOne(email);
+    if (existing) {
+      throw new Error('User already exists');
+    }
+
+    const user = await this.usersService.create(email, pass);
+    return this.login(user);
+  }
+
+  async forgotPassword(email: string) {
+    const user = await this.usersService.findOne(email);
+    if (!user) {
+      // Don't leak user existence
+      return { message: 'If an account exists, a reset link has been sent' };
+    }
+
+    // In a real app, generate a reset token and send email.
+    // For now, we'll log it.
+    console.log(`Password reset requested for ${email}`);
+    return { message: 'If an account exists, a reset link has been sent' };
+  }
 }

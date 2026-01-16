@@ -24,6 +24,16 @@ export class AuthController {
     return this.authService.login(req.user);
   }
 
+  @Post('register')
+  async register(@Body() body: any) {
+    return this.authService.register(body.email, body.password);
+  }
+
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.authService.forgotPassword(body.email);
+  }
+
   @Get('github')
   @UseGuards(AuthGuard('github'))
   async githubLogin() {
