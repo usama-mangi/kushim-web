@@ -8,7 +8,7 @@ export class MLScoringService {
 
   constructor(private prisma: PrismaService) {}
 
-  async runShadowScoring(
+  runShadowScoring(
     a: UnifiedRecord,
     b: UnifiedRecord,
     deterministicScore: number,

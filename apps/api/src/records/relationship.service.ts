@@ -18,7 +18,7 @@ export class RelationshipService {
       const score = this.calculateLinkScore(newRecord, candidate);
 
       // Trigger shadow ML scoring regardless of deterministic threshold
-      await this.mlScoringService.runShadowScoring(newRecord, candidate, score);
+      this.mlScoringService.runShadowScoring(newRecord, candidate, score);
 
       if (score >= 0.7) {
         await this.createLink(newRecord, candidate, score);
