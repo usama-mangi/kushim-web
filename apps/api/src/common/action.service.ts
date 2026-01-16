@@ -25,6 +25,8 @@ export class ActionService {
     const targetQuery = parts[1];
     const payload = parts.slice(2).join(' ');
 
+    this.logger.log(`Executing command: ${verb} on ${targetQuery}`);
+
     const record = await this.prisma.unifiedRecord.findFirst({
       where: {
         userId,
@@ -38,7 +40,7 @@ export class ActionService {
 
     if (!record) throw new Error(`Target record "${targetQuery}" not found`);
 
-    let credentials = record.source.credentialsEncrypted;
+    let credentials: any = record.source.credentialsEncrypted;
     if (
       credentials &&
       typeof credentials === 'object' &&
@@ -47,13 +49,27 @@ export class ActionService {
       credentials = await this.encryptionService.decryptObject(credentials);
     }
 
+    if (!credentials) throw new Error('Source credentials not found');
+
+    const metadata = record.metadata as any;
+    if (!metadata) throw new Error('Record metadata not found');
+
     if (record.sourcePlatform === 'github' && verb === ActionVerb.COMMENT) {
-      const octokit = new Octokit({ auth: credentials.token });
-      const [owner, repo] = record.metadata['repository'].split('/');
+      const token = credentials.token as string;
+      if (!token) throw new Error('GitHub token not found in credentials');
+
+      const octokit = new Octokit({ auth: token });
+      const repoPath = metadata['repository'] as string;
+      if (!repoPath) throw new Error('Repository path not found in metadata');
+
+      const [owner, repo] = repoPath.split('/');
+      const issueNumber = metadata['number'] as number;
+      if (!issueNumber) throw new Error('Issue number not found in metadata');
+
       await octokit.rest.issues.createComment({
         owner,
         repo,
-        issue_number: record.metadata['number'],
+        issue_number: issueNumber,
         body: payload,
       });
     }

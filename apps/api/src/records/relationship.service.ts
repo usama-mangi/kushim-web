@@ -13,7 +13,17 @@ export class RelationshipService {
   ) {}
 
   async discoverRelationships(newRecord: UnifiedRecord) {
-    // ...
+    // 1. Fetch potential candidates for linking (same user, recent)
+    const candidates = await this.prisma.unifiedRecord.findMany({
+      where: {
+        userId: newRecord.userId,
+        id: { not: newRecord.id },
+        timestamp: {
+          gt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
+        },
+      },
+    });
+
     for (const candidate of candidates) {
       const score = this.calculateLinkScore(newRecord, candidate);
 
@@ -115,9 +125,6 @@ export class RelationshipService {
   }
 
   private async updateContextGroups(a: UnifiedRecord, b: UnifiedRecord) {
-    // Phase 1 implementation of Context Groups:
-    // If two records are linked, they should belong to the same group.
-
     const aGroups = await this.prisma.contextGroupMember.findMany({
       where: { recordId: a.id },
     });
@@ -126,7 +133,6 @@ export class RelationshipService {
     });
 
     if (aGroups.length === 0 && bGroups.length === 0) {
-      // Create new group
       const newGroup = await this.prisma.contextGroup.create({
         data: {
           userId: a.userId,
@@ -140,7 +146,6 @@ export class RelationshipService {
         `Created new context group ${newGroup.id} for records ${a.id}, ${b.id}`,
       );
     } else if (aGroups.length > 0 && bGroups.length === 0) {
-      // Add b to a's group(s)
       for (const group of aGroups) {
         await this.prisma.contextGroupMember.upsert({
           where: {
@@ -154,7 +159,6 @@ export class RelationshipService {
         });
       }
     } else if (aGroups.length === 0 && bGroups.length > 0) {
-      // Add a to b's group(s)
       for (const group of bGroups) {
         await this.prisma.contextGroupMember.upsert({
           where: {
@@ -168,14 +172,10 @@ export class RelationshipService {
         });
       }
     } else {
-      // Both already in groups. In Phase 1, we might merge groups or just leave them.
-      // For simplicity, we ensure they share at least one group.
-      // If they are in different groups, merge them into a's first group.
       if (aGroups[0].contextGroupId !== bGroups[0].contextGroupId) {
         const targetGroupId = aGroups[0].contextGroupId;
         const sourceGroupId = bGroups[0].contextGroupId;
 
-        // Move all members from source to target
         const sourceMembers = await this.prisma.contextGroupMember.findMany({
           where: { contextGroupId: sourceGroupId },
         });
@@ -197,7 +197,6 @@ export class RelationshipService {
           });
         }
 
-        // Delete old group
         await this.prisma.contextGroup.delete({ where: { id: sourceGroupId } });
         this.logger.log(
           `Merged context group ${sourceGroupId} into ${targetGroupId}`,
