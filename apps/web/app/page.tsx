@@ -1,38 +1,38 @@
 'use client';
 
-import { useDashboardStore } from '@/store/useStore';
+import { useDashboardStore, Artifact, ContextGroup } from '@/store/useStore';
 import { useSocket } from '@/hooks/useSocket';
-import { useEffect, useState, useCallback } from 'react';
-import { LayoutDashboard, Database, RefreshCw, Activity, LogOut, Shield, Search, Command, ExternalLink, Clock, User, Link as LinkIcon } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { 
+  LayoutDashboard, Database, RefreshCw, Activity, LogOut, Shield, 
+  Search, Command, ExternalLink, Clock, User, Link as LinkIcon,
+  X, ChevronRight, MessageSquare, UserPlus, CheckCircle2, AlertCircle,
+  Hash, Github, Slack, FileText, Send, MoreHorizontal
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
-interface ContextGroup {
-  id: string;
-  name: string;
-  updatedAt: string;
-  members: {
-    weight: number;
-    record: {
-      id: string;
-      title: string;
-      sourcePlatform: string;
-      artifactType: string;
-      url: string;
-      timestamp: string;
-      author: string;
-    }
-  }[];
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }
 
-export default function Home() {
-  const { records, setRecords } = useDashboardStore();
+export default function AmbientFeed() {
+  const { 
+    records, setRecords, 
+    contextGroups, setContextGroups,
+    selectedArtifact, setSelectedArtifact,
+    isDetailPanelOpen, setDetailPanelOpen,
+    isCommandBarOpen, setCommandBarOpen
+  } = useDashboardStore();
+  
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [activeSourcesCount, setActiveSourcesCount] = useState(0);
-  const [contextGroups, setContextGroups] = useState<ContextGroup[]>([]);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [syncing, setSyncing] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [commandInput, setActionInput] = useState('');
 
   useSocket();
 
@@ -44,11 +44,8 @@ export default function Home() {
     }
 
     try {
-      const [recordsRes, sourcesRes, groupsRes] = await Promise.all([
+      const [recordsRes, groupsRes] = await Promise.all([
         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/records`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/sources`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/records/context-groups`, {
@@ -57,187 +54,215 @@ export default function Home() {
       ]);
       
       setRecords(recordsRes.data);
-      setActiveSourcesCount(sourcesRes.data.length);
       setContextGroups(groupsRes.data);
     } catch (error) {
-      console.error('Failed to fetch data', error);
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         router.push('/login');
       }
     } finally {
       setLoading(false);
     }
-  }, [router, setRecords]);
+  }, [router, setRecords, setContextGroups]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Command Bar (Cmd+K) logic
+  // Keyboard Shortcuts
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setSearchOpen((open) => !open);
+        setCommandBarOpen(!isCommandBarOpen);
+      }
+      if (e.key === 'Escape') {
+        setCommandBarOpen(false);
+        setDetailPanelOpen(false);
       }
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.push('/login');
-  };
+  }, [isCommandBarOpen, setCommandBarOpen, setDetailPanelOpen]);
 
   const handleSync = async () => {
+    setSyncing(true);
     try {
       const token = localStorage.getItem('token');
       const sourcesRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/sources`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
-      const sources = sourcesRes.data;
-      if (sources.length === 0) return;
-
-      await Promise.all(sources.map((source: any) => 
+      await Promise.all(sourcesRes.data.map((source: any) => 
         axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/trigger/${source.id}`, {}, { headers: { Authorization: `Bearer ${token}` } })
       ));
-
-      alert(`Sync triggered for ${sources.length} sources!`);
-      setTimeout(fetchData, 2000); // Refresh after a bit
+      
+      setTimeout(fetchData, 3000);
     } catch (error) {
       console.error('Sync failed', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const executeAction = async (cmd: string) => {
+    const token = localStorage.getItem('token');
+    setActionLoading(true);
+    try {
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/actions/execute`, 
+        { command: cmd }, 
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert(res.data.message);
+      setCommandBarOpen(false);
+      setActionInput('');
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Action failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const filteredRecords = useMemo(() => {
+    if (!searchQuery) return [];
+    return records.filter(r => 
+      r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      r.body.toLowerCase().includes(searchQuery.toLowerCase())
+    ).slice(0, 10);
+  }, [records, searchQuery]);
+
+  const getPlatformIcon = (platform: string) => {
+    switch (platform.toLowerCase()) {
+      case 'github': return <Github className="w-4 h-4" />;
+      case 'slack': return <Slack className="w-4 h-4" />;
+      case 'jira': return <Hash className="w-4 h-4 text-blue-500" />;
+      default: return <FileText className="w-4 h-4" />;
     }
   };
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center bg-gray-50">Loading...</div>;
-  }
-
-  const handleAction = async (command: string) => {
-    const token = localStorage.getItem('token');
-    try {
-        const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/actions/execute`, { command }, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        alert(res.data.message);
-        setSearchOpen(false);
-        setSearchQuery('');
-    } catch (error: any) {
-        alert(error.response?.data?.message || 'Failed to execute command');
-    }
-  };
-
-  const isCommand = (text: string) => {
-    const verbs = ['comment', 'assign', 'reply', 'close'];
-    return verbs.some(v => text.toLowerCase().startsWith(v));
-  };
-
-  return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-indigo-600">Kushim</h1>
-        </div>
-        <nav className="flex-1 mt-6">
-          <a href="#" className="flex items-center px-6 py-3 text-gray-700 bg-gray-100 border-r-4 border-indigo-600">
-            <LayoutDashboard className="w-5 h-5 mr-3" />
-            Ambient Feed
-          </a>
-          <a href="/sources" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
-            <Database className="w-5 h-5 mr-3" />
-            Sources
-          </a>
-          <a href="/activity" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
-            <Activity className="w-5 h-5 mr-3" />
-            Activity
-          </a>
-          <a href="/mfa/setup" className="flex items-center px-6 py-3 text-gray-500 hover:bg-gray-50">
-            <Shield className="w-5 h-5 mr-3" />
-            Security
-          </a>
-        </nav>
-        <div className="p-4 border-t border-gray-200 text-xs text-gray-400 text-center">
-          Press <kbd className="px-1.5 py-0.5 border rounded bg-gray-50 font-sans">⌘K</kbd> to search
-        </div>
-        <div className="p-4 border-t border-gray-200">
-          <button onClick={handleLogout} className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition">
-            <LogOut className="w-5 h-5 mr-3" />
-            Logout
-          </button>
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4" />
+          <p className="text-indigo-200/50 font-medium tracking-widest text-xs uppercase animate-pulse">Initializing Kushim</p>
         </div>
       </div>
+    );
+  }
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8">
-          <h2 className="text-xl font-semibold text-gray-800">Ambient Feed</h2>
+  return (
+    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sansSelection">
+      {/* Navigation Rail */}
+      <aside className="w-20 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-8 space-y-8 z-20">
+        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <span className="text-white font-black text-xl">K</span>
+        </div>
+        
+        <nav className="flex-1 flex flex-col space-y-4">
+          <button className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl transition-all" title="Ambient Feed">
+            <LayoutDashboard className="w-6 h-6" />
+          </button>
+          <a href="/sources" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Data Sources">
+            <Database className="w-6 h-6" />
+          </a>
+          <a href="/activity" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Audit Logs">
+            <Activity className="w-6 h-6" />
+          </a>
+          <a href="/mfa/setup" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Security">
+            <Shield className="w-6 h-6" />
+          </a>
+        </nav>
+
+        <button 
+          onClick={() => { localStorage.removeItem('token'); router.push('/login'); }}
+          className="p-3 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+        >
+          <LogOut className="w-6 h-6" />
+        </button>
+      </aside>
+
+      {/* Main Feed Area */}
+      <div className="flex-1 flex flex-col relative min-w-0">
+        <header className="h-20 border-b border-slate-800 flex items-center justify-between px-10 bg-slate-950/50 backdrop-blur-xl z-10 sticky top-0">
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Ambient Feed</h1>
+            <p className="text-xs text-slate-500 font-medium uppercase tracking-widest mt-0.5">Real-time context synchronization</p>
+          </div>
+
           <div className="flex items-center space-x-4">
+            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 cursor-pointer hover:border-slate-700 transition group" onClick={() => setCommandBarOpen(true)}>
+              <Search className="w-4 h-4 text-slate-500 group-hover:text-slate-300 mr-2" />
+              <span className="text-sm text-slate-500 group-hover:text-slate-400 pr-8">Search or command...</span>
+              <kbd className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">⌘K</kbd>
+            </div>
+
             <button 
-                onClick={() => setSearchOpen(true)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition"
+              onClick={handleSync}
+              disabled={syncing}
+              className={cn(
+                "flex items-center px-4 py-2 rounded-lg font-semibold text-sm transition-all",
+                syncing ? "bg-slate-800 text-slate-500 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
+              )}
             >
-                <Search className="w-5 h-5" />
-            </button>
-            <button 
-                onClick={handleSync}
-                className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm"
-            >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Sync
+              <RefreshCw className={cn("w-4 h-4 mr-2", syncing && "animate-spin")} />
+              {syncing ? "Syncing..." : "Sync"}
             </button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-8 bg-gray-50/50">
+        <main className="flex-1 overflow-y-auto p-10 space-y-10 scrollbar-hide">
           {contextGroups.length > 0 ? (
-            <div className="space-y-8 max-w-5xl mx-auto">
+            <div className="max-w-4xl mx-auto space-y-12">
               {contextGroups.map((group) => (
-                <div key={group.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/30 flex justify-between items-center">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{group.name}</h3>
-                      <div className="flex items-center text-xs text-gray-400 mt-1">
-                        <Clock className="w-3 h-3 mr-1" />
-                        Updated {new Date(group.updatedAt).toLocaleString()}
-                        <span className="mx-2">•</span>
-                        <LinkIcon className="w-3 h-3 mr-1" />
-                        {group.members.length} artifacts
-                      </div>
+                <div key={group.id} className="relative">
+                  {/* Timeline logic line */}
+                  <div className="absolute left-[-24px] top-0 bottom-0 w-[2px] bg-gradient-to-b from-indigo-500/50 via-slate-800 to-transparent" />
+                  
+                  <div className="mb-6 flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)] z-10" />
+                      <h2 className="text-lg font-bold text-white group cursor-pointer flex items-center">
+                        {group.name}
+                        <ChevronRight className="w-4 h-4 ml-1 text-slate-600 group-hover:text-indigo-400 transition" />
+                      </h2>
+                    </div>
+                    <div className="flex items-center text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+                      <Clock className="w-3 h-3 mr-1" />
+                      Last updated {new Date(group.updatedAt).toLocaleTimeString()}
                     </div>
                   </div>
-                  <div className="p-0">
-                    {group.members.map((member, idx) => (
-                      <div key={member.record.id} className={`p-4 flex items-start space-x-4 ${idx !== group.members.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50 transition group`}>
-                        <div className={`p-2 rounded-lg ${
-                          member.record.sourcePlatform === 'github' ? 'bg-gray-100 text-gray-700' :
-                          member.record.sourcePlatform === 'jira' ? 'bg-blue-100 text-blue-700' :
-                          'bg-orange-100 text-orange-700'
-                        }`}>
-                          <Database className="w-5 h-5" />
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {group.members.map((member) => (
+                      <div 
+                        key={member.record.id}
+                        onClick={() => setSelectedArtifact(member.record)}
+                        className={cn(
+                          "bg-slate-900/40 border border-slate-800/50 rounded-xl p-4 flex items-start space-x-4 hover:bg-slate-800/50 hover:border-slate-700 transition cursor-pointer group relative overflow-hidden",
+                          selectedArtifact?.id === member.record.id && "border-indigo-500/50 bg-indigo-500/5"
+                        )}
+                      >
+                        <div className="p-2.5 bg-slate-950 rounded-lg text-slate-400 group-hover:text-indigo-400 border border-slate-800 group-hover:border-indigo-500/20 transition shadow-inner">
+                          {getPlatformIcon(member.record.sourcePlatform)}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-semibold text-gray-900 truncate pr-4">{member.record.title}</h4>
-                            <a href={member.record.url} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 transition">
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          </div>
-                          <div className="flex items-center mt-1 space-x-4 text-xs text-gray-500">
-                            <span className="flex items-center uppercase tracking-tighter font-bold text-[10px] text-gray-400">
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition truncate pr-6">{member.record.title}</h3>
+                          <div className="flex items-center mt-2 space-x-4">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-950 rounded border border-slate-800">
                               {member.record.sourcePlatform}
                             </span>
-                            <span className="flex items-center">
-                              <User className="w-3 h-3 mr-1" />
+                            <span className="flex items-center text-[11px] text-slate-500">
+                              <User className="w-3 h-3 mr-1 opacity-50" />
                               {member.record.author}
                             </span>
-                            <span className="flex items-center">
-                              <Clock className="w-3 h-3 mr-1" />
+                            <span className="flex items-center text-[11px] text-slate-500">
+                              <Clock className="w-3 h-3 mr-1 opacity-50" />
                               {new Date(member.record.timestamp).toLocaleDateString()}
                             </span>
                           </div>
+                        </div>
+                        <div className="opacity-0 group-hover:opacity-100 transition absolute right-4 top-4">
+                          <MoreHorizontal className="w-4 h-4 text-slate-500" />
                         </div>
                       </div>
                     ))}
@@ -246,78 +271,185 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center py-20">
-              <div className="bg-white p-6 rounded-full shadow-sm border border-gray-100 mb-6">
-                <Command className="w-12 h-12 text-gray-300" />
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-2xl">
+                <Command className="w-8 h-8 text-slate-700" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Your Ambient Feed is empty</h3>
-              <p className="text-gray-500 max-w-sm">
-                Connect data sources and sync records to see automatically discovered context groups here.
+              <h3 className="text-xl font-bold text-white mb-2">No Ambient Context Discovered</h3>
+              <p className="text-slate-500 max-w-sm mx-auto text-sm leading-relaxed text-balance">
+                Connect your workspace tools to enable deterministic linking and watch Kushim assemble your work graph.
               </p>
+              <button onClick={handleSync} className="mt-8 px-6 py-2.5 bg-slate-900 border border-slate-800 rounded-full text-sm font-semibold hover:bg-slate-800 transition shadow-lg">
+                Connect Data Sources
+              </button>
             </div>
           )}
         </main>
+      </div>
 
-        {/* Global Command Bar Overlay */}
-        {searchOpen && (
-          <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4">
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setSearchOpen(false)} />
-            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden relative z-10 border border-gray-200">
-              <div className="flex items-center px-4 py-4 border-b border-gray-100">
-                <Search className="w-5 h-5 text-gray-400 mr-3" />
-                <input 
-                  autoFocus
-                  placeholder="Search or type command (e.g., 'comment PROJ-123 Looks good')..."
-                  className="flex-1 bg-transparent border-none outline-none text-lg text-gray-900"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && isCommand(searchQuery)) {
-                        handleAction(searchQuery);
+      {/* Artifact Detail Panel */}
+      <aside className={cn(
+        "fixed inset-y-0 right-0 w-[500px] bg-slate-900 border-l border-slate-800 shadow-2xl z-30 transition-transform duration-300 ease-in-out transform flex flex-col",
+        isDetailPanelOpen ? "translate-x-0" : "translate-x-full"
+      )}>
+        {selectedArtifact && (
+          <>
+            <header className="h-20 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-950/20">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
+                  {getPlatformIcon(selectedArtifact.sourcePlatform)}
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{selectedArtifact.artifactType}</span>
+              </div>
+              <button onClick={() => setDetailPanelOpen(false)} className="p-2 hover:bg-slate-800 rounded-full transition text-slate-500">
+                <X className="w-5 h-5" />
+              </button>
+            </header>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-8">
+              <section>
+                <h2 className="text-2xl font-bold text-white leading-tight mb-4">{selectedArtifact.title}</h2>
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {selectedArtifact.participants.map(p => (
+                    <span key={p} className="px-2 py-1 bg-slate-800 rounded text-[11px] text-slate-300 flex items-center">
+                      <User className="w-3 h-3 mr-1 opacity-50" /> {p}
+                    </span>
+                  ))}
+                </div>
+                <div className="prose prose-invert prose-sm max-w-none text-slate-400 leading-relaxed whitespace-pre-wrap">
+                  {selectedArtifact.body || <span className="italic text-slate-600">No description provided.</span>}
+                </div>
+              </section>
+
+              <section className="space-y-4">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center">
+                  <ExternalLink className="w-3 h-3 mr-1.5" /> Platform Metadata
+                </h4>
+                <div className="bg-slate-950/50 rounded-xl border border-slate-800 p-4 space-y-3">
+                  {Object.entries(selectedArtifact.metadata).map(([k, v]) => (
+                    <div key={k} className="flex justify-between text-[11px]">
+                      <span className="text-slate-500 capitalize">{k.replace('_', ' ')}</span>
+                      <span className="text-slate-300 font-mono truncate ml-4">
+                        {Array.isArray(v) ? v.join(', ') : String(v)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+
+            <footer className="p-6 bg-slate-950/50 border-t border-slate-800">
+              <div className="flex items-center space-x-2">
+                <a 
+                  href={selectedArtifact.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2.5 rounded-lg text-sm font-bold flex items-center justify-center transition shadow-lg shadow-indigo-500/10"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  View on {selectedArtifact.sourcePlatform}
+                </a>
+                <button className="p-2.5 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition">
+                  <MoreHorizontal className="w-5 h-5 text-slate-300" />
+                </button>
+              </div>
+            </footer>
+          </>
+        )}
+      </aside>
+
+      {/* Command Bar Modal */}
+      {isCommandBarOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4">
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setCommandBarOpen(false)} />
+          <div className="bg-slate-900 w-full max-w-2xl rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden relative z-10 border border-slate-800 transform animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center px-6 py-5 border-b border-slate-800 bg-slate-900">
+              <Command className="w-5 h-5 text-indigo-500 mr-4" />
+              <input 
+                autoFocus
+                placeholder="Search or execute (e.g. 'comment PR-12 Looks good')..."
+                className="flex-1 bg-transparent border-none outline-none text-lg text-white placeholder-slate-600 font-medium"
+                value={commandInput || searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setActionInput(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const verbs = ['comment', 'assign', 'reply', 'close'];
+                    if (verbs.some(v => commandInput.toLowerCase().startsWith(v))) {
+                      executeAction(commandInput);
                     }
-                  }}
-                />
-                <div className="flex items-center space-x-1 text-[10px] text-gray-400 font-medium">
-                  <kbd className="px-1.5 py-0.5 border rounded bg-gray-50">ESC</kbd>
-                </div>
-              </div>
-              <div className="max-h-[60vh] overflow-y-auto">
-                {searchQuery.length > 0 ? (
-                  <div className="p-2">
-                    {records.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 10).map((record) => (
-                      <div key={record.id} className="p-3 hover:bg-indigo-50 rounded-xl cursor-pointer transition group flex items-center space-x-3">
-                        <div className="p-2 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-white group-hover:text-indigo-600">
-                           <Database className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-gray-900">{record.title}</p>
-                          <p className="text-xs text-gray-400 uppercase font-bold tracking-tighter">{record.sourcePlatform}</p>
-                        </div>
-                      </div>
-                    ))}
-                    {records.filter(r => r.title.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
-                      <div className="p-8 text-center text-gray-500 italic text-sm">
-                        No results found for "{searchQuery}"
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-gray-400">
-                    <p className="text-sm">Start typing to search across all platforms...</p>
-                  </div>
-                )}
-              </div>
-              <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-[11px] text-gray-400">
-                <div className="flex items-center space-x-4">
-                  <span><kbd className="px-1.5 py-0.5 border rounded bg-white mr-1">↵</kbd> Select</span>
-                  <span><kbd className="px-1.5 py-0.5 border rounded bg-white mr-1">↑↓</kbd> Navigate</span>
-                </div>
-                <div>Kushim Search</div>
+                  }
+                }}
+              />
+              <div className="flex items-center space-x-2">
+                <kbd className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded border border-slate-700 uppercase">Esc</kbd>
               </div>
             </div>
+            
+            <div className="max-h-[50vh] overflow-y-auto scrollbar-hide py-2">
+              {searchQuery.length > 0 ? (
+                <div className="px-2">
+                  {filteredRecords.length > 0 ? (
+                    filteredRecords.map((record) => (
+                      <div 
+                        key={record.id} 
+                        onClick={() => { setSelectedArtifact(record); setCommandBarOpen(false); }}
+                        className="p-3 hover:bg-slate-800 rounded-xl cursor-pointer transition group flex items-center space-x-4 mx-2"
+                      >
+                        <div className="p-2 rounded-lg bg-slate-950 text-slate-500 group-hover:text-indigo-400 border border-slate-800 group-hover:border-indigo-500/30 transition">
+                           {getPlatformIcon(record.sourcePlatform)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-200 group-hover:text-white transition truncate">{record.title}</p>
+                          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{record.sourcePlatform} • {record.author}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-700 group-hover:text-slate-400 transition" />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-12 text-center">
+                      <AlertCircle className="w-8 h-8 text-slate-800 mx-auto mb-3" />
+                      <p className="text-slate-500 text-sm">No artifacts matching "{searchQuery}"</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-6 space-y-6">
+                  <div>
+                    <h4 className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-3 px-2">Common Actions</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { icon: <MessageSquare className="w-4 h-4"/>, label: 'Comment on artifact', cmd: 'comment [id] [text]' },
+                        { icon: <UserPlus className="w-4 h-4"/>, label: 'Assign to team member', cmd: 'assign [id] @user' },
+                        { icon: <CheckCircle2 className="w-4 h-4"/>, label: 'Close ticket or PR', cmd: 'close [id]' },
+                        { icon: <RefreshCw className="w-4 h-4"/>, label: 'Trigger manual sync', cmd: 'sync' },
+                      ].map(item => (
+                        <div key={item.label} className="p-3 bg-slate-950/50 border border-slate-800 rounded-xl flex items-center space-x-3 hover:border-slate-700 transition cursor-pointer group">
+                          <div className="p-2 bg-slate-900 rounded-lg text-slate-500 group-hover:text-indigo-400 transition">{item.icon}</div>
+                          <div>
+                            <p className="text-xs font-semibold text-slate-300">{item.label}</p>
+                            <p className="text-[9px] font-mono text-slate-600 uppercase tracking-tighter mt-0.5">{item.cmd}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex justify-between items-center">
+              <div className="flex items-center space-x-4 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                <span className="flex items-center"><kbd className="bg-slate-900 px-1.5 py-0.5 rounded mr-1.5 border border-slate-800">↵</kbd> Select</span>
+                <span className="flex items-center"><kbd className="bg-slate-900 px-1.5 py-0.5 rounded mr-1.5 border border-slate-800">↑↓</kbd> Navigate</span>
+              </div>
+              <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-tighter">Powered by Kushim Protocol</div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
