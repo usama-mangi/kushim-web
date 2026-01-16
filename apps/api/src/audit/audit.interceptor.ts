@@ -20,14 +20,20 @@ export class AuditInterceptor implements NestInterceptor {
       tap(() => {
         // Only log mutations or specific access if needed.
         // For production, we usually log POST/PATCH/DELETE or sensitive GETs.
-        if (method !== 'GET' || url.includes('records') || url.includes('profile')) {
-          this.auditService.log({
-            userId: user?.userId,
-            action: method,
-            resource: url,
-            payload: method !== 'GET' ? request.body : undefined,
-            ipAddress: ip,
-          }).catch(err => console.error('Audit Logging Failed', err));
+        if (
+          method !== 'GET' ||
+          url.includes('records') ||
+          url.includes('profile')
+        ) {
+          this.auditService
+            .log({
+              userId: user?.userId,
+              action: method,
+              resource: url,
+              payload: method !== 'GET' ? request.body : undefined,
+              ipAddress: ip,
+            })
+            .catch((err) => console.error('Audit Logging Failed', err));
         }
       }),
     );

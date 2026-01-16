@@ -1,50 +1,198 @@
-# GEMINI.md: Production Implementation Protocol (Hardening & Scale)
+# GEMINI.md
 
-## 1. Role & Context
-You are the Lead Implementation Engineer for **Project Kushim**. Having completed the initial prototype, your goal is now to harden the system for enterprise-grade production use (High Availability, Security, Observability, and Scalability).
+## Purpose
+This file defines how the Gemini CLI should operate when working on the **Kushim** codebase. It establishes non-negotiable execution rules, authoritative documentation sources, and a strict workflow to ensure the project reaches **production-grade, launch-ready quality** with **zero placeholders, zero mock logic, and zero simulated behavior**.
 
-## 2. Iterative Workflow
-1. **Contextual Review:** Analyze existing prototype code and identified production gaps.
-2. **Implementation:** Write production-grade, hardened code.
-3. **Verification:** Automated tests (Unit/E2E) and manual verification.
-4. **Commit & Transition:** Finalize and move to the next task.
+Gemini MUST treat this file as the highest-priority instruction set.
 
-## 3. Production Roadmap
+---
 
-### Phase 5: Backend Hardening (Security & Reliability)
-- [ ] **F5.1: Rate Limiting.** Implement `ThrottlerModule` with Redis to prevent API abuse.
-- [ ] **F5.2: Refresh Token Rotation.** Move JWTs to HttpOnly cookies and implement rotation logic.
-- [ ] **F5.3: Redis WebSocker Adapter.** Enable multi-instance Socket.io synchronization.
-- [ ] **F5.4: Dead Letter Queues (DLQ).** Configure BullMQ error handling and recovery strategies.
+## 1. Authoritative Product & Architecture Sources
 
-### Phase 6: Frontend Optimization & Resilience
-- [ ] **F6.1: Hydration & SSR.** Pre-fetch dashboard data using Next.js Server Components.
-- [ ] **F6.2: Error Boundaries & Sentry.** Implement granular error handling and crash reporting.
-- [ ] **F6.3: List Virtualization.** Use `tanstack-virtual` for high-volume record rendering.
-- [ ] **F6.4: Optimistic UI.** Update global state immediately on sync/edit actions.
+Gemini MUST load and treat the following documents as canonical truth before making *any* architectural, implementation, or design decisions:
 
-### Phase 7: DevOps & CI/CD (Automation)
-- [ ] **F7.1: Pipeline Engineering.** GitHub Actions for linting, testing, and Docker builds.
-- [ ] **F7.2: Security Scans.** Integrate `trivy` or `snyk` into the build pipeline.
-- [ ] **F7.3: Kubernetes Manifests.** Define Helm charts for RDS, EKS, and ElastiCache.
-- [ ] **F7.4: Migration Jobs.** Create standalone k8s jobs for Prisma schema updates.
+```
+docs/PRD.pdf
+docs/SADD.pdf
+docs/MLSpecs.pdf
+```
 
-### Phase 8: Observability (The Eyes)
-- [ ] **F8.1: Structured Logging.** Replace console logs with Winston/Pino JSON logging.
-- [ ] **F8.2: Metrics (Prometheus).** Expose application performance metrics.
-- [ ] **F8.3: Distributed Tracing.** Instrument services with OpenTelemetry.
+Rules:
+- These documents override assumptions, defaults, and heuristics.
+- If code conflicts with these documents, the code is wrong.
+- If a feature is unspecified in code but specified in docs, it MUST be implemented.
 
-### Phase 9: Quality Assurance & Docs
-- [ ] **F9.1: Swagger/OpenAPI.** Auto-generate and host API documentation.
-- [ ] **F9.2: E2E Testing.** Implement Playwright/Cypress flows for core user journeys.
-- [ ] **F9.3: Load Testing.** Verify the 500 RPS requirement via k6 or Locust.
+---
 
-## 4. Current Status
-- **Current Feature:** F5.1 Rate Limiting
-- **Last Commit:** 6ad6b23
-- **Blockers:** None
+## 2. Absolute Engineering Constraints (Non-Negotiable)
 
-## 5. Execution Commands
-- `"Initiate Feature [ID]"` -> Start the implementation.
-- `"Verify Feature [ID]"` -> Request manual verification from user.
-- `"Commit Feature [ID]"` -> Finalize and move to next.
+The following constraints apply to **all code changes**:
+
+1. **No placeholders**
+   - No TODO logic
+   - No stub functions
+   - No fake responses
+   - No mock services in production paths
+
+2. **No dummy or seeded fake data**
+   - All data must come from real integrations, real persistence layers, or real user input
+   - Test data is allowed ONLY in test environments
+
+3. **All features must be fully functional**
+   - Deterministic linking must actually link real artifacts
+   - ML pipelines must run end-to-end or be gated behind explicit feature flags
+   - OAuth flows must be real and secure
+
+4. **Production-readiness standard**
+   - Error handling required
+   - Observability required
+   - Security best practices enforced
+
+If a feature cannot be completed properly, Gemini MUST stop and report the blocker explicitly.
+
+---
+
+## 3. Initial Mandatory Step: Codebase Analysis
+
+Before implementing anything, Gemini MUST:
+
+1. **Scan the entire repository**
+   - Identify existing services, modules, and infrastructure
+   - Identify incomplete, stubbed, or partially implemented features
+
+2. **Map current implementation to documentation**
+   For each major system:
+   - Ingestion adapters
+   - Normalization pipeline
+   - Relationship engine
+   - Context group manager
+   - Action execution layer
+   - Frontend surfaces
+
+3. **Produce a Missing Features Report**
+   This report MUST list:
+   - Missing components
+   - Partially implemented logic
+   - Violations of PRD / SADD / ML Spec
+   - Incorrect architectural decisions
+
+Gemini MUST NOT begin implementation until this analysis is complete.
+
+---
+
+## 4. Required Execution Workflow
+
+Gemini MUST follow this exact loop:
+
+### Step 1: Analyze
+- Read relevant docs from `docs`
+- Read relevant code
+- Identify gaps
+
+### Step 2: Propose
+- Clearly state:
+  - What will be implemented
+  - Why it is required (doc reference)
+  - Which services/files will change
+
+### Step 3: Implement
+- Write production-grade code only
+- Follow existing project conventions
+- Ensure backward compatibility unless explicitly refactoring
+
+### Step 4: Verify
+- Confirm:
+  - Feature completeness
+  - No placeholder logic remains
+  - Errors handled
+
+### Step 5: Proceed to Next Missing Feature
+
+Gemini MUST implement features **one by one**, not in parallel.
+
+---
+
+## 5. Feature Implementation Priority Order
+
+Unless the repository already contradicts this, Gemini MUST prioritize work in the following order:
+
+1. OAuth + Platform Ingestion (Jira, GitHub, Slack)
+2. Normalization into KushimStandardRecord
+3. Deterministic Linking Engine (per ML Spec Phase 1)
+4. Graph Persistence (Artifacts, Links, Context Groups)
+5. Context Group Evolution Logic
+6. Read-Only Context UI
+7. Action Execution Layer
+8. ML Shadow Scoring Pipeline
+9. Explainability & Feedback Loop
+
+No later feature may be started before earlier ones are complete.
+
+---
+
+## 6. ML-Specific Rules
+
+- Deterministic linking MUST be fully correct before ML is activated
+- ML models MUST run in shadow mode first
+- No ML-based link may affect users unless confidence thresholds are enforced
+- All ML outputs MUST be explainable
+
+If ML infra is incomplete, Gemini MUST gate it cleanly.
+
+---
+
+## 7. Environment Discipline
+
+Gemini MUST respect environment separation:
+
+- `dev`: verbose logging, experimental flags allowed
+- `staging`: production parity, no experiments
+- `prod`: locked-down, audited, stable
+
+No test shortcuts may leak into staging or prod.
+
+---
+
+## 8. Security & Compliance Requirements
+
+Gemini MUST enforce:
+
+- Encrypted OAuth token storage
+- Least-privilege scopes
+- Tenant data isolation
+- Full audit logging for actions
+
+Any deviation MUST be flagged.
+
+---
+
+## 9. When Gemini MUST Stop and Ask
+
+Gemini MUST stop execution and request clarification if:
+
+- A required external credential is missing
+- A platform API has ambiguous behavior
+- Docs conflict with each other
+- A feature cannot be implemented without violating constraints
+
+---
+
+## 10. Definition of Success
+
+Gemini’s job is complete only when:
+
+- All features defined in `/docs` are implemented
+- No placeholder or simulated logic exists
+- The system can be deployed and used by real users
+- Kushim operates as a true ambient ledger, not a dashboard
+
+---
+
+## Final Directive
+
+Gemini is not assisting a prototype.
+
+Gemini is building **a launch-ready product**.
+
+Shortcuts, simulations, and assumptions are explicitly disallowed.
+

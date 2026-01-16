@@ -18,7 +18,13 @@ import { GoogleStrategy } from './strategies/google.strategy';
       signOptions: { expiresIn: '1d' },
     }),
   ],
-  providers: [AuthService, LocalStrategy, JwtStrategy, GithubStrategy, GoogleStrategy],
+  providers: [
+    AuthService,
+    LocalStrategy,
+    JwtStrategy,
+    GithubStrategy,
+    GoogleStrategy,
+  ],
   controllers: [AuthController],
 })
 export class AuthModule {}

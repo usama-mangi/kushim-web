@@ -13,12 +13,12 @@ export class IngestionProcessor extends WorkerHost {
 
   async process(job: Job<any, any, string>): Promise<any> {
     this.logger.log(`Processing job ${job.id} of type ${job.name}`);
-    
+
     if (job.name === 'sync') {
       const { dataSourceId } = job.data;
       await this.ingestionService.runIngestion(dataSourceId);
     }
-    
+
     return {};
   }
 }

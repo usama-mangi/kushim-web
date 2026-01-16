@@ -11,8 +11,10 @@ export class EncryptionService {
     // In production, this should be a 32-byte hex string from env
     const envKey = process.env.ENCRYPTION_KEY;
     if (!envKey) {
-      console.warn('WARNING: ENCRYPTION_KEY not set. Using insecure default for dev.');
-      this.key =  Buffer.alloc(32, 'insecure-default-key-for-dev-only');
+      console.warn(
+        'WARNING: ENCRYPTION_KEY not set. Using insecure default for dev.',
+      );
+      this.key = Buffer.alloc(32, 'insecure-default-key-for-dev-only');
     } else {
       this.key = Buffer.from(envKey, 'hex');
     }
@@ -30,7 +32,10 @@ export class EncryptionService {
     const iv = Buffer.from(ivHex, 'hex');
     const content = Buffer.from(contentHex, 'hex');
     const decipher = createDecipheriv(this.algorithm, this.key, iv);
-    const decrypted = Buffer.concat([decipher.update(content), decipher.final()]);
+    const decrypted = Buffer.concat([
+      decipher.update(content),
+      decipher.final(),
+    ]);
     return decrypted.toString();
   }
 

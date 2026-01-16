@@ -1,27 +1,27 @@
-import { BaseAdapter, NormalizedRecord } from './base.adapter';
+import { BaseAdapter } from './base.adapter';
 import { createHash } from 'crypto';
 import { Octokit } from 'octokit';
+import { KushimStandardRecord, ArtifactType } from '../../common/ksr.interface';
+import { v4 as uuidv4 } from 'uuid';
 
 export class GithubAdapter extends BaseAdapter {
   name = 'github';
 
-  async fetch(credentials: any): Promise<any[]> {
+  async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
     if (!credentials?.token) {
-      // Fallback for seed data if no token is provided, or throw error
-      // Ideally we shouldn't have mock data anymore, but for the 'default-github-source' 
-      // in seed which has empty credentials, this will fail.
-      // I will throw an error to enforce real credentials.
-      throw new Error('GitHub Personal Access Token is required in credentials');
+      throw new Error(
+        'GitHub Personal Access Token is required in credentials',
+      );
     }
 
     const octokit = new Octokit({ auth: credentials.token });
-    
-    // Fetch issues assigned to the user
+
     try {
       const { data } = await octokit.rest.issues.list({
-        filter: 'assigned',
-        state: 'open',
-        per_page: 20,
+        filter: 'all',
+        state: 'all',
+        since: lastSync ? lastSync.toISOString() : undefined,
+        per_page: 50,
       });
       return data;
     } catch (error) {
@@ -30,28 +30,34 @@ export class GithubAdapter extends BaseAdapter {
     }
   }
 
-  normalize(rawRecord: any): NormalizedRecord {
-    const payload = {
+  normalize(rawRecord: any): KushimStandardRecord {
+    const payload: Omit<KushimStandardRecord, 'checksum' | 'id'> = {
       externalId: String(rawRecord.id),
+      sourcePlatform: 'github',
+      artifactType: rawRecord.pull_request
+        ? ArtifactType.PULL_REQUEST
+        : ArtifactType.ISSUE,
       title: rawRecord.title,
-      type: 'issue',
+      body: rawRecord.body || '',
       url: rawRecord.html_url,
+      author: rawRecord.user?.login || 'unknown',
+      timestamp: new Date(rawRecord.updated_at || rawRecord.created_at),
+      participants: (rawRecord.assignees || []).map((a: any) => a.login),
       metadata: {
-        repository: rawRecord.repository?.full_name || 'unknown',
+        repository: rawRecord.repository?.full_name,
         number: rawRecord.number,
         state: rawRecord.state,
-        created_at: rawRecord.created_at,
-        source: 'github',
+        labels: (rawRecord.labels || []).map((l: any) => l.name),
       },
     };
-    
+
     const checksum = createHash('sha256')
       .update(JSON.stringify(payload))
       .digest('hex');
 
     return {
-      id: String(rawRecord.id),
-      payload,
+      id: uuidv4(),
+      ...payload,
       checksum,
     };
   }

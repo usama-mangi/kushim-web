@@ -32,7 +32,7 @@ export class AuthService {
         temp_token: this.jwtService.sign(payload, { expiresIn: '5m' }), // Short lived
       };
     }
-    
+
     // Standard login for non-MFA users
     const payload = { email: user.email, sub: user.id, role: user.role.name };
     return {
@@ -46,7 +46,7 @@ export class AuthService {
   }
 
   async verifyMfaLogin(userId: string, token: string) {
-    const user = await this.prisma.user.findUnique({ 
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { role: true },
     });
@@ -84,13 +84,13 @@ export class AuthService {
   async generateMfaSecret(userId: string) {
     const secret = authenticator.generateSecret();
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    
+
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
     const otpauthUrl = authenticator.keyuri(user.email, 'Kushim', secret);
-    
+
     await this.prisma.user.update({
       where: { id: userId },
       data: { mfaSecret: secret },
@@ -124,7 +124,7 @@ export class AuthService {
 
   async validateOrCreateSocialUser(email: string, provider: string) {
     let user = await this.usersService.findOne(email);
-    
+
     if (!user) {
       // Create new user with random password
       const randomPassword = Math.random().toString(36).slice(-8);

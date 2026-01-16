@@ -26,6 +26,7 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+.cursor/
 
 # Misc
 .turbo/

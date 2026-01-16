@@ -7,11 +7,13 @@ import { IngestionController } from './ingestion.controller';
 import { SyncSchedulerService } from './sync-scheduler.service';
 import { CommonModule } from '../common/common.module';
 import { AuditModule } from '../audit/audit.module';
+import { RecordsModule } from '../records/records.module';
 
 @Module({
   imports: [
     CommonModule,
     AuditModule,
+    RecordsModule,
     ScheduleModule.forRoot(),
     BullModule.forRoot({
       connection: {

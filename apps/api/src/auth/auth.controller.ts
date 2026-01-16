@@ -1,5 +1,14 @@
-import { Controller, Post, UseGuards, Request, Get, Body, Res } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  UseGuards,
+  Request,
+  Get,
+  Body,
+  Res,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -8,6 +17,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   async login(@Request() req: any) {
@@ -58,12 +68,13 @@ export class AuthController {
   async generateMfa(@Request() req: any) {
     return this.auditMfaGeneration(req.user.userId);
   }
-  
+
   // Helper to keep logic clean, actually calling service
   private async auditMfaGeneration(userId: string) {
     return this.authService.generateMfaSecret(userId);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @Post('mfa/verify')
   async verifyMfa(@Request() req: any, @Body() body: { token: string }) {
@@ -72,9 +83,10 @@ export class AuthController {
 
   // Use a special guard or just check the token payload manually in service?
   // Since we are using the standard JwtAuthGuard, it will validate the signature.
-  // The service logic will check the 'isMfaTemp' payload if we want strict enforcement there, 
+  // The service logic will check the 'isMfaTemp' payload if we want strict enforcement there,
   // but for now, we just trust the userId extraction.
   // Note: JwtStrategy extracts 'sub' as 'userId'.
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @Post('mfa/login')
   async mfaLogin(@Request() req: any, @Body() body: { token: string }) {

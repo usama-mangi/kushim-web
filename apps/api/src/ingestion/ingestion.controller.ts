@@ -1,4 +1,13 @@
-import { Controller, Post, Param, UseGuards, Get, Patch, Body } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Param,
+  UseGuards,
+  Get,
+  Patch,
+  Body,
+  Request,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -6,6 +15,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../common/encryption.service';
+import { IngestionService } from './ingestion.service';
 
 @Controller('ingestion')
 export class IngestionController {
@@ -13,6 +23,7 @@ export class IngestionController {
     @InjectQueue('ingestion') private ingestionQueue: Queue,
     private prisma: PrismaService,
     private encryptionService: EncryptionService,
+    private ingestionService: IngestionService,
   ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -25,27 +36,38 @@ export class IngestionController {
 
   @UseGuards(JwtAuthGuard)
   @Get('sources')
-  async getSources() {
-    return this.prisma.dataSource.findMany({
-      where: { status: 'active' },
-      select: {
-        id: true,
-        providerName: true,
-        status: true,
-        createdAt: true,
-        // Do not return credentials
+  async getSources(@Request() req: any) {
+    return this.ingestionService.getSources(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('sources')
+  async createSource(
+    @Request() req: any,
+    @Body() body: { providerName: string; credentials: any },
+  ) {
+    const encryptedCredentials = await this.encryptionService.encryptObject(
+      body.credentials,
+    );
+    return this.prisma.dataSource.create({
+      data: {
+        userId: req.user.userId,
+        providerName: body.providerName,
+        credentialsEncrypted: encryptedCredentials,
+        status: 'active',
       },
     });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'USER')
   @Patch('sources/:id')
   async updateSourceCredentials(
     @Param('id') id: string,
     @Body() credentials: any,
   ) {
-    const encryptedCredentials = await this.encryptionService.encryptObject(credentials);
+    const encryptedCredentials =
+      await this.encryptionService.encryptObject(credentials);
     return this.prisma.dataSource.update({
       where: { id },
       data: {

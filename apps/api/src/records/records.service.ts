@@ -6,39 +6,30 @@ import { Prisma } from '@prisma/client';
 export class RecordsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(params: { search?: string; source?: string } = {}) {
-    const { search, source } = params;
+  async findAll(
+    params: { search?: string; source?: string; type?: string } = {},
+  ) {
+    const { search, source, type } = params;
     const where: Prisma.UnifiedRecordWhereInput = {};
 
     if (source) {
-      where.source = {
-        providerName: source,
-      };
+      where.sourcePlatform = source;
+    }
+
+    if (type) {
+      where.artifactType = type;
     }
 
     if (search) {
-      where.payload = {
-        path: ['title'],
-        string_contains: search,
-      };
-      // Note: JSONB filtering can be complex.
-      // For simplicity/compatibility, we might rely on client-side search for small datasets
-      // or specific JSON path logic if supported by Prisma/DB version.
-      // A more robust way for JSONB search:
-      // where.AND = [
-      //   { payload: { path: ['title'], string_contains: search } }
-      // ]
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { body: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
-    // Since Prisma's JSON filtering support varies, let's implement a basic
-    // "contains" check if the payload was just text, but it's an object.
-    // Ideally we use Raw query for performant JSON text search or
-    // strict path filtering if we know the structure.
-    // For 'Kushim Standard', we know 'title' exists.
-    
     return this.prisma.unifiedRecord.findMany({
       where,
-      orderBy: { id: 'desc' },
+      orderBy: { timestamp: 'desc' },
       include: {
         source: {
           select: {
@@ -46,6 +37,26 @@ export class RecordsService {
           },
         },
       },
+    });
+  }
+
+  async findOne(id: string) {
+    return this.prisma.unifiedRecord.findUnique({
+      where: { id },
+    });
+  }
+
+  async findContextGroups(userId: string) {
+    return this.prisma.contextGroup.findMany({
+      where: { userId, status: 'active' },
+      include: {
+        members: {
+          include: {
+            record: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 }

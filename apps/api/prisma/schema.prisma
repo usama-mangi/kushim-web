@@ -40,6 +40,7 @@ model DataSource {
   providerName         String   @map("provider_name")
   credentialsEncrypted Json     @map("credentials_encrypted")
   status               String   @default("active")
+  lastSync             DateTime? @map("last_sync")
   createdAt            DateTime @default(now()) @map("created_at")
 
   user                 User            @relation(fields: [userId], references: [id])
@@ -49,18 +50,78 @@ model DataSource {
 }
 
 model UnifiedRecord {
-  id       String @id @default(uuid()) @db.Uuid
-  userId   String @map("user_id") @db.Uuid
-  sourceId String @map("source_id") @db.Uuid
-  payload  Json
-  checksum String @unique
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  sourceId       String   @map("source_id") @db.Uuid
+  externalId     String   @map("external_id")
+  sourcePlatform String   @map("source_platform")
+  artifactType   String   @map("artifact_type")
+  title          String
+  body           String   @db.Text
+  url            String?
+  author         String
+  timestamp      DateTime
+  participants   String[]
+  metadata       Json
+  checksum       String   @unique
 
-  user     User       @relation(fields: [userId], references: [id])
-  source   DataSource @relation(fields: [sourceId], references: [id])
+  user   User       @relation(fields: [userId], references: [id])
+  source DataSource @relation(fields: [sourceId], references: [id])
+  
+  linksAsSource Link[] @relation("SourceRecord")
+  linksAsTarget Link[] @relation("TargetRecord")
+  
+  contextGroups ContextGroupMember[]
 
   @@index([userId, sourceId], name: "idx_records_user_source")
+  @@index([sourcePlatform, artifactType], name: "idx_records_platform_type")
+  @@index([timestamp], name: "idx_records_timestamp")
   @@map("unified_records")
 }
+
+model Link {
+  id               String   @id @default(uuid()) @db.Uuid
+  sourceRecordId   String   @map("source_record_id") @db.Uuid
+  targetRecordId   String   @map("target_record_id") @db.Uuid
+  confidenceScore  Float    @map("confidence_score")
+  relationshipType String   @map("relationship_type")
+  discoveryMethod  String   @map("discovery_method")
+  metadata         Json?    @map("metadata")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  sourceRecord UnifiedRecord @relation("SourceRecord", fields: [sourceRecordId], references: [id])
+  targetRecord UnifiedRecord @relation("TargetRecord", fields: [targetRecordId], references: [id])
+
+  @@unique([sourceRecordId, targetRecordId])
+  @@map("links")
+}
+
+model ContextGroup {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  name        String
+  description String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members ContextGroupMember[]
+
+  @@map("context_groups")
+}
+
+model ContextGroupMember {
+  contextGroupId String @map("context_group_id") @db.Uuid
+  recordId       String @map("record_id") @db.Uuid
+  weight         Float  @default(1.0)
+
+  contextGroup ContextGroup  @relation(fields: [contextGroupId], references: [id])
+  record       UnifiedRecord @relation(fields: [recordId], references: [id])
+
+  @@id([contextGroupId, recordId])
+  @@map("context_group_members")
+}
+
 
 model ActivityLog {
   id        String   @id @default(uuid()) @db.Uuid

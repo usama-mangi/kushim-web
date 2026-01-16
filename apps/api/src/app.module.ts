@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -11,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AuditModule } from './audit/audit.module';
 import { AuditInterceptor } from './audit/audit.interceptor';
 import { CommonModule } from './common/common.module';
+import { RedisThrottlerStorage } from './common/throttler-storage';
 
 @Module({
   imports: [
@@ -22,6 +24,15 @@ import { CommonModule } from './common/common.module';
     RecordsModule,
     NotificationsModule,
     AuditModule,
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 60000,
+          limit: 100,
+        },
+      ],
+      storage: new RedisThrottlerStorage(),
+    }),
   ],
   controllers: [AppController],
   providers: [
@@ -29,6 +40,10 @@ import { CommonModule } from './common/common.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })

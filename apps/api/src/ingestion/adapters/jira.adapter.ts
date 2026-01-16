@@ -1,11 +1,13 @@
-import { BaseAdapter, NormalizedRecord } from './base.adapter';
+import { BaseAdapter } from './base.adapter';
 import { createHash } from 'crypto';
 import { Version3Client } from 'jira.js';
+import { KushimStandardRecord, ArtifactType } from '../../common/ksr.interface';
+import { v4 as uuidv4 } from 'uuid';
 
 export class JiraAdapter extends BaseAdapter {
   name = 'jira';
 
-  async fetch(credentials: any): Promise<any[]> {
+  async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
     if (!credentials?.host || !credentials?.email || !credentials?.apiToken) {
       throw new Error('Jira host, email, and apiToken are required');
     }
@@ -21,9 +23,31 @@ export class JiraAdapter extends BaseAdapter {
     });
 
     try {
+      let jql = 'order by updated DESC';
+      if (lastSync) {
+        // Jira JQL uses yyyy-MM-dd HH:mm or similar
+        const dateStr = lastSync
+          .toISOString()
+          .replace('T', ' ')
+          .substring(0, 16);
+        jql = `updated >= "${dateStr}" ${jql}`;
+      }
+
       const search = await client.issueSearch.searchForIssuesUsingJql({
-        jql: 'assignee = currentUser() AND resolution = Unresolved ORDER BY priority DESC',
-        maxResults: 20,
+        jql,
+        maxResults: 50,
+        fields: [
+          'summary',
+          'description',
+          'status',
+          'priority',
+          'project',
+          'created',
+          'updated',
+          'creator',
+          'assignee',
+          'reporter',
+        ],
       });
       return search.issues || [];
     } catch (error) {
@@ -32,28 +56,40 @@ export class JiraAdapter extends BaseAdapter {
     }
   }
 
-  normalize(rawRecord: any): NormalizedRecord {
-    const payload = {
-      externalId: rawRecord.key, // Use Key (e.g., PROJ-123) as external ID
-      title: rawRecord.fields.summary,
-      type: 'task',
-      url: `${rawRecord.self.split('/rest/api')[0]}/browse/${rawRecord.key}`, // Construct web URL
+  normalize(rawRecord: any): KushimStandardRecord {
+    const fields = rawRecord.fields || {};
+
+    const payload: Omit<KushimStandardRecord, 'checksum' | 'id'> = {
+      externalId: rawRecord.key,
+      sourcePlatform: 'jira',
+      artifactType: ArtifactType.TASK,
+      title: fields.summary,
+      body: fields.description || '',
+      url: `${rawRecord.self.split('/rest/api')[0]}/browse/${rawRecord.key}`,
+      author:
+        fields.creator?.emailAddress ||
+        fields.creator?.displayName ||
+        'unknown',
+      timestamp: new Date(fields.updated || fields.created),
+      participants: [
+        fields.assignee?.emailAddress || fields.assignee?.displayName,
+        fields.reporter?.emailAddress || fields.reporter?.displayName,
+      ].filter(Boolean) as string[],
       metadata: {
-        status: rawRecord.fields.status?.name,
-        priority: rawRecord.fields.priority?.name,
-        project: rawRecord.fields.project?.name,
-        created: rawRecord.fields.created,
-        source: 'jira',
+        status: fields.status?.name,
+        priority: fields.priority?.name,
+        project: fields.project?.name,
+        projectKey: fields.project?.key,
       },
     };
-    
+
     const checksum = createHash('sha256')
       .update(JSON.stringify(payload))
       .digest('hex');
 
     return {
-      id: rawRecord.id, // Internal Jira ID
-      payload,
+      id: uuidv4(),
+      ...payload,
       checksum,
     };
   }

@@ -7,6 +7,7 @@ import { BaseAdapter } from './adapters/base.adapter';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { EncryptionService } from '../common/encryption.service';
 import { AuditService } from '../audit/audit.service';
+import { RelationshipService } from '../records/relationship.service';
 
 @Injectable()
 export class IngestionService {
@@ -18,6 +19,7 @@ export class IngestionService {
     private notificationsGateway: NotificationsGateway,
     private encryptionService: EncryptionService,
     private auditService: AuditService,
+    private relationshipService: RelationshipService,
   ) {
     this.adapters.set('github', new GithubAdapter());
     this.adapters.set('jira', new JiraAdapter());
@@ -36,12 +38,15 @@ export class IngestionService {
 
     const adapter = this.adapters.get(dataSource.providerName);
     if (!adapter) {
-      throw new Error(`No adapter found for provider ${dataSource.providerName}`);
+      throw new Error(
+        `No adapter found for provider ${dataSource.providerName}`,
+      );
     }
 
-    this.logger.log(`Starting ingestion for ${dataSource.providerName} (User: ${dataSource.userId})`);
-    
-    // Log start
+    this.logger.log(
+      `Starting ingestion for ${dataSource.providerName} (User: ${dataSource.userId})`,
+    );
+
     await this.auditService.log({
       userId: dataSource.userId,
       action: 'SYNC_START',
@@ -50,60 +55,91 @@ export class IngestionService {
     });
 
     let credentials = dataSource.credentialsEncrypted;
-    
-    // Check if it's encrypted (has _encrypted property) and decrypt
-    if (credentials && typeof credentials === 'object' && !Array.isArray(credentials) && '_encrypted' in credentials) {
+
+    if (
+      credentials &&
+      typeof credentials === 'object' &&
+      !Array.isArray(credentials) &&
+      '_encrypted' in credentials
+    ) {
       try {
         credentials = await this.encryptionService.decryptObject(credentials);
       } catch (err) {
         const errorMsg = 'Credential decryption failed';
         this.logger.error(errorMsg, err);
-        await this.auditService.log({
-          userId: dataSource.userId,
-          action: 'SYNC_FAIL',
-          resource: `source/${dataSource.providerName}`,
-          payload: { error: errorMsg },
-        });
         throw new Error(errorMsg);
       }
     }
 
     try {
-      const rawData = await adapter.fetch(credentials);
+      const lastSync = dataSource.lastSync
+        ? new Date(dataSource.lastSync)
+        : undefined;
+      const rawData = await adapter.fetch(credentials, lastSync);
       let newCount = 0;
-      
+
       for (const raw of rawData) {
         const normalized = adapter.normalize(raw);
-        
+
         const record = await this.prisma.unifiedRecord.upsert({
           where: { checksum: normalized.checksum },
           update: {
-            payload: normalized.payload,
+            externalId: normalized.externalId,
+            sourcePlatform: normalized.sourcePlatform,
+            artifactType: normalized.artifactType,
+            title: normalized.title,
+            body: normalized.body,
+            url: normalized.url,
+            author: normalized.author,
+            timestamp: normalized.timestamp,
+            participants: normalized.participants,
+            metadata: normalized.metadata,
           },
           create: {
             userId: dataSource.userId,
             sourceId: dataSource.id,
-            payload: normalized.payload,
+            externalId: normalized.externalId,
+            sourcePlatform: normalized.sourcePlatform,
+            artifactType: normalized.artifactType,
+            title: normalized.title,
+            body: normalized.body,
+            url: normalized.url,
+            author: normalized.author,
+            timestamp: normalized.timestamp,
+            participants: normalized.participants,
+            metadata: normalized.metadata,
             checksum: normalized.checksum,
           },
         });
+
+        // Trigger relationship discovery
+        await this.relationshipService.discoverRelationships(record);
 
         this.notificationsGateway.broadcast('recordUpdated', record);
         newCount++;
       }
 
-      this.logger.log(`Ingestion completed for ${dataSource.providerName}. Records: ${newCount}`);
-      
+      await this.prisma.dataSource.update({
+        where: { id: dataSource.id },
+        data: { lastSync: new Date() },
+      });
+
+      this.logger.log(
+        `Ingestion completed for ${dataSource.providerName}. Records: ${newCount}`,
+      );
+
       await this.auditService.log({
         userId: dataSource.userId,
         action: 'SYNC_COMPLETE',
         resource: `source/${dataSource.providerName}`,
         payload: { count: newCount },
       });
-
     } catch (error) {
-      this.logger.error(`Ingestion failed for ${dataSource.providerName}`, error);
-      
+      this.logger.error(
+        `Ingestion failed for ${dataSource.providerName}`,
+        error,
+      );
+
       await this.auditService.log({
         userId: dataSource.userId,
         action: 'SYNC_FAIL',
@@ -112,5 +148,18 @@ export class IngestionService {
       });
       throw error;
     }
+  }
+
+  async getSources(userId: string) {
+    return this.prisma.dataSource.findMany({
+      where: { userId, status: 'active' },
+      select: {
+        id: true,
+        providerName: true,
+        status: true,
+        lastSync: true,
+        createdAt: true,
+      },
+    });
   }
 }
