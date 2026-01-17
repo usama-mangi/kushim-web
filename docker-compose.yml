@@ -25,9 +25,26 @@ services:
     networks:
       - kushim_network
 
+  neo4j:
+    image: neo4j:5-community
+    container_name: kushim_neo4j
+    restart: always
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    environment:
+      NEO4J_AUTH: neo4j/kushim_graph_pass
+      NEO4J_PLUGINS: '["apoc", "graph-data-science"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*,gds.*
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - kushim_network
+
 volumes:
   postgres_data:
   redis_data:
+  neo4j_data:
 
 networks:
   kushim_network:

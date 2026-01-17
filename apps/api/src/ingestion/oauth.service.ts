@@ -1,0 +1,268 @@
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { EncryptionService } from '../common/encryption.service';
+import { v4 as uuidv4 } from 'uuid';
+
+@Injectable()
+export class OAuthService {
+  private readonly logger = new Logger(OAuthService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private encryptionService: EncryptionService,
+  ) {}
+
+  async getAuthUrl(provider: string, userId: string): Promise<string> {
+    const state = await this.generateState(userId);
+    
+    switch (provider) {
+      case 'github':
+        return this.getGithubAuthUrl(state);
+      case 'jira':
+        return this.getJiraAuthUrl(state);
+      case 'slack':
+        return this.getSlackAuthUrl(state);
+      case 'google':
+        return this.getGoogleAuthUrl(state);
+      default:
+        throw new BadRequestException('Unsupported provider');
+    }
+  }
+
+  async handleCallback(provider: string, code: string, state: string): Promise<any> {
+    const userId = await this.validateState(state);
+    let credentials: any;
+
+    switch (provider) {
+      case 'github':
+        credentials = await this.exchangeGithubToken(code);
+        break;
+      case 'jira':
+        credentials = await this.exchangeJiraToken(code);
+        break;
+      case 'slack':
+        credentials = await this.exchangeSlackToken(code);
+        break;
+      case 'google':
+        credentials = await this.exchangeGoogleToken(code);
+        break;
+      default:
+        throw new BadRequestException('Unsupported provider');
+    }
+
+    const encryptedCredentials = await this.encryptionService.encryptObject(credentials);
+
+    // Upsert DataSource
+    const dataSource = await this.prisma.dataSource.create({
+      data: {
+        userId,
+        providerName: provider,
+        credentialsEncrypted: encryptedCredentials,
+        status: 'active',
+      },
+    });
+
+    return dataSource;
+  }
+
+  private async generateState(userId: string): Promise<string> {
+    const payload = JSON.stringify({ userId, nonce: uuidv4() });
+    return this.encryptionService.encrypt(payload);
+  }
+
+  private async validateState(state: string): Promise<string> {
+    try {
+      const decrypted = await this.encryptionService.decrypt(state);
+      const payload = JSON.parse(decrypted);
+      if (!payload.userId) throw new Error('Invalid state payload');
+      return payload.userId;
+    } catch (e) {
+      throw new BadRequestException('Invalid OAuth state');
+    }
+  }
+
+  private getGithubAuthUrl(state: string): string {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    if (!clientId) throw new Error('GITHUB_CLIENT_ID not configured');
+    
+    const redirectUri = process.env.GITHUB_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/github/callback';
+    const scopes = ['repo', 'user:email']; // Adjust scopes as needed
+
+    return `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes.join(' ')}&state=${state}`;
+  }
+
+  private getJiraAuthUrl(state: string): string {
+    const clientId = process.env.JIRA_CLIENT_ID;
+    if (!clientId) throw new Error('JIRA_CLIENT_ID not configured');
+    
+    const redirectUri = process.env.JIRA_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/jira/callback';
+    const scopes = ['read:jira-work', 'read:jira-user', 'offline_access']; // Adjust scopes
+
+    return `https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id=${clientId}&scope=${scopes.join('%20')}&redirect_uri=${redirectUri}&state=${state}&response_type=code&prompt=consent`;
+  }
+
+  private getSlackAuthUrl(state: string): string {
+    const clientId = process.env.SLACK_CLIENT_ID;
+    if (!clientId) throw new Error('SLACK_CLIENT_ID not configured');
+    
+    const redirectUri = process.env.SLACK_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/slack/callback';
+    const scopes = ['channels:read', 'channels:history', 'chat:write', 'files:read', 'stars:read']; 
+
+    return `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes.join(',')}&redirect_uri=${redirectUri}&state=${state}`;
+  }
+
+  private getGoogleAuthUrl(state: string): string {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const redirectUri = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/google/callback';
+    
+    if (!clientId) throw new Error('GOOGLE_CLIENT_ID not configured');
+
+    const scopes = [
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'email',
+        'profile'
+    ];
+
+    return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scopes.join(' ')}&state=${state}&access_type=offline&prompt=consent`;
+  }
+
+  private async exchangeGoogleToken(code: string): Promise<any> {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/google/callback';
+
+    if (!clientId || !clientSecret) throw new Error('Google credentials not configured');
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!response.ok) {
+        const err = await response.text();
+        this.logger.error(`Google Token Error: ${err}`);
+        throw new Error('Failed to exchange Google token');
+    }
+
+    return await response.json();
+  }
+
+  private async exchangeGithubToken(code: string): Promise<any> {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+    
+    if (!clientId || !clientSecret) throw new Error('GitHub credentials not configured');
+
+    const response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to exchange GitHub token');
+    }
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error_description || 'GitHub OAuth Error');
+    
+    return { token: data.access_token };
+  }
+
+  private async exchangeJiraToken(code: string): Promise<any> {
+    const clientId = process.env.JIRA_CLIENT_ID;
+    const clientSecret = process.env.JIRA_CLIENT_SECRET;
+    const redirectUri = process.env.JIRA_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/jira/callback';
+
+    if (!clientId || !clientSecret) throw new Error('Jira credentials not configured');
+
+    const response = await fetch('https://auth.atlassian.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri,
+      }),
+    });
+
+    if (!response.ok) {
+        const err = await response.text();
+        this.logger.error(`Jira Token Error: ${err}`);
+        throw new Error('Failed to exchange Jira token');
+    }
+
+    const tokenData = await response.json();
+
+    // Fetch accessible resources to get cloudId
+    const resourcesResponse = await fetch('https://api.atlassian.com/oauth/token/accessible-resources', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+
+    if (!resourcesResponse.ok) {
+      throw new Error('Failed to fetch Jira accessible resources');
+    }
+
+    const resources = await resourcesResponse.json();
+    if (resources.length === 0) {
+      throw new Error('No Jira resources accessible');
+    }
+
+    // Use the first resource (site)
+    // In a real app, we might ask the user to select one if multiple exist
+    const site = resources[0];
+    
+    return {
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      host: `https://api.atlassian.com/ex/jira/${site.id}`,
+      cloudId: site.id,
+      siteName: site.name,
+    };
+  }
+
+  private async exchangeSlackToken(code: string): Promise<any> {
+    const clientId = process.env.SLACK_CLIENT_ID;
+    const clientSecret = process.env.SLACK_CLIENT_SECRET;
+    const redirectUri = process.env.SLACK_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/slack/callback';
+
+    if (!clientId || !clientSecret) throw new Error('Slack credentials not configured');
+
+    // Slack uses x-www-form-urlencoded usually, but supports JSON in v2
+    const form = new URLSearchParams();
+    form.append('code', code);
+    form.append('client_id', clientId);
+    form.append('client_secret', clientSecret);
+    form.append('redirect_uri', redirectUri);
+
+    const response = await fetch('https://slack.com/api/oauth.v2.access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form,
+    });
+
+    const data: any = await response.json();
+    if (!data.ok) {
+      throw new Error(data.error || 'Slack OAuth Error');
+    }
+
+    return { token: data.access_token, team: data.team, authed_user: data.authed_user };
+  }
+}

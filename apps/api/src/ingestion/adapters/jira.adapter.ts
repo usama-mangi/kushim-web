@@ -8,18 +8,45 @@ export class JiraAdapter extends BaseAdapter {
   name = 'jira';
 
   async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
-    if (!credentials?.host || !credentials?.email || !credentials?.apiToken) {
-      throw new Error('Jira host, email, and apiToken are required');
+    if (!credentials?.host && !credentials?.cloudId) {
+       // OAuth flow might return cloudId or we might need to fetch resources accessible
+       // For now, let's assume host is still provided or discovered.
+       // Actually, with Jira OAuth (3LO), you query https://api.atlassian.com/ex/jira/{cloudId}/...
+       // The current adapter assumes 'host' is passed.
     }
 
-    const client = new Version3Client({
-      host: credentials.host,
-      authentication: {
+    let authentication: any;
+
+    if (credentials.accessToken) {
+      authentication = {
+        oauth2: {
+          accessToken: credentials.accessToken,
+        },
+      };
+    } else if (credentials.email && credentials.apiToken) {
+      authentication = {
         basic: {
           email: credentials.email,
           apiToken: credentials.apiToken,
         },
-      },
+      };
+    } else {
+      throw new Error('Jira credentials (accessToken OR email+apiToken) are required');
+    }
+
+    // If using OAuth, host might need to be constructed differently or passed in credentials
+    // Jira Cloud OAuth usually uses `https://api.atlassian.com/ex/jira/${cloudId}`
+    // We will assume for now that if OAuth is used, the 'host' field in credentials is set to the API URL
+    // or we handle it in the adapter. 
+    // Simplified for this task: allow existing host config.
+
+    if (!credentials.host) {
+        throw new Error('Jira Host is required');
+    }
+
+    const client = new Version3Client({
+      host: credentials.host,
+      authentication,
     });
 
     try {

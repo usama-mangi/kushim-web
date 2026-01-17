@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GithubAdapter } from './adapters/github.adapter';
 import { JiraAdapter } from './adapters/jira.adapter';
 import { SlackAdapter } from './adapters/slack.adapter';
+import { GoogleAdapter } from './adapters/google.adapter';
 import { BaseAdapter } from './adapters/base.adapter';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { EncryptionService } from '../common/encryption.service';
@@ -24,6 +25,7 @@ export class IngestionService {
     this.adapters.set('github', new GithubAdapter());
     this.adapters.set('jira', new JiraAdapter());
     this.adapters.set('slack', new SlackAdapter());
+    this.adapters.set('google', new GoogleAdapter());
   }
 
   async runIngestion(dataSourceId: string) {
