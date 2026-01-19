@@ -2,6 +2,18 @@
 
 ## 1. Missing Components
 
+### Context Group Management UI (Priority 6.5 - HIGH)
+- **Current State:** Context groups can only be created via command bar
+- **Missing Features:**
+  - ❌ **GUI for creating context groups** - No visual interface to create new groups
+  - ❌ **Delete context groups** - No way to remove custom groups
+  - ❌ **Rename context groups** - Cannot edit group names after creation
+  - ❌ **Manual artifact assignment** - Cannot manually add/remove artifacts from groups
+  - ❌ **Group metadata editing** - No UI to edit group topics, description, or settings
+  - ❌ **Merge/split UI** - No visual controls for merging or splitting groups (backend exists)
+- **Impact:** Users cannot manage context groups without using command bar
+- **Required For:** Production readiness - core CRUD operations for primary domain entity
+
 ### Infrastructure (SADD 9.2, 9.3, 10.1)
 - **Vector Store:** Missing. Required for Phase 2 ML linking.
 - **Event Bus:** SADD specifies Kafka/Pulsar. Current implementation uses BullMQ (Redis).
@@ -82,9 +94,10 @@
 1.  ~~**Refactor Deterministic Linking:** Move linking logic to Cypher queries~~ ✅ **COMPLETED**
 2.  ~~**Context Group Evolution:** Move Context Group management entirely to Graph~~  ✅ **COMPLETED**
 3.  ~~**Frontend Graph View:** Visualize the graph data in the frontend.~~ ✅ **COMPLETED**
-4.  **Action Execution:** Complete Jira, Slack, and Google action handlers (currently only GitHub) (Priority 7)
-5.  **ML Scoring:** Replace placeholder semantic similarity with real embeddings (Priority 8)
-6.  **Explainability UI:** Add link explanation and user feedback system (Priority 9)
+4.  **Context Group Management UI:** Complete CRUD interface for context groups (Priority 6.5) ⚠️ **HIGH PRIORITY**
+5.  **Action Execution:** Complete Jira, Slack, and Google action handlers (currently only GitHub) (Priority 7)
+6.  **ML Scoring:** Replace placeholder semantic similarity with real embeddings (Priority 8)
+7.  **Explainability UI:** Add link explanation and user feedback system (Priority 9)
 
 ## 4. Phase 1 Completion Summary (2026-01-19)
 
