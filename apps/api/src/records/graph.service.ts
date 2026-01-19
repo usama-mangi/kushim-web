@@ -76,7 +76,12 @@ export class GraphService {
     const groupId = crypto.randomUUID();
     const cypher = `
       MERGE (g:ContextGroup {id: $groupId})
-      SET g.name = $title, g.createdAt = datetime(), g.updatedAt = datetime()
+      SET g.name = $title, 
+          g.createdAt = datetime(), 
+          g.updatedAt = datetime(),
+          g.coherenceScore = 1.0,
+          g.topics = [],
+          g.status = 'active'
       WITH g
       MATCH (a:Artifact {id: $recordAId})
       MATCH (b:Artifact {id: $recordBId})
@@ -85,7 +90,102 @@ export class GraphService {
       RETURN g
     `;
     await this.neo4jService.run(cypher, { groupId, title, recordAId, recordBId });
+    
+    // Calculate initial topics and coherence
+    await this.updateGroupMetadata(groupId);
+    
     return groupId;
+  }
+
+  async updateGroupMetadata(groupId: string) {
+    // Get all artifacts in the group
+    const cypher = `
+      MATCH (g:ContextGroup {id: $groupId})<-[:BELONGS_TO]-(a:Artifact)
+      RETURN a.title as title, a.body as body, a.metadata as metadata
+    `;
+    const artifacts = await this.neo4jService.run(cypher, { groupId });
+    
+    if (artifacts.length === 0) return;
+
+    // Extract topics using simple keyword extraction
+    const allText = artifacts.map(r => 
+      `${r.get('title')} ${r.get('body')}`
+    ).join(' ');
+    
+    const topics = this.extractTopics(allText);
+    const coherenceScore = await this.calculateCoherenceScore(groupId);
+
+    // Update group with metadata
+    const updateCypher = `
+      MATCH (g:ContextGroup {id: $groupId})
+      SET g.topics = $topics,
+          g.coherenceScore = $coherenceScore,
+          g.updatedAt = datetime()
+    `;
+    await this.neo4jService.run(updateCypher, { groupId, topics, coherenceScore });
+  }
+
+  private extractTopics(text: string, maxTopics: number = 5): string[] {
+    // Simple keyword extraction: most common meaningful words
+    const words = text.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 3);
+    
+    // Remove common stopwords
+    const stopwords = new Set(['this', 'that', 'with', 'from', 'have', 'been', 'were', 'will', 'would', 'could', 'should']);
+    const filtered = words.filter(w => !stopwords.has(w));
+    
+    // Count frequency
+    const frequency: Record<string, number> = {};
+    filtered.forEach(word => {
+      frequency[word] = (frequency[word] || 0) + 1;
+    });
+    
+    // Get top N topics
+    return Object.entries(frequency)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, maxTopics)
+      .map(([word]) => word);
+  }
+
+  async calculateCoherenceScore(groupId: string): Promise<number> {
+    // Calculate coherence based on link density and temporal proximity
+    const cypher = `
+      MATCH (g:ContextGroup {id: $groupId})<-[:BELONGS_TO]-(a:Artifact)
+      WITH g, collect(a) as artifacts, count(a) as artifactCount
+      
+      // Count links between artifacts in the group
+      UNWIND artifacts as a1
+      UNWIND artifacts as a2
+      WITH g, artifacts, artifactCount, a1, a2
+      WHERE id(a1) < id(a2)
+      OPTIONAL MATCH (a1)-[r:RELATED_TO]-(a2)
+      
+      WITH g, artifactCount, 
+           count(r) as linkCount,
+           artifactCount * (artifactCount - 1) / 2.0 as maxPossibleLinks,
+           artifacts
+      
+      // Calculate average confidence of existing links
+      UNWIND artifacts as a1
+      UNWIND artifacts as a2
+      WITH g, artifactCount, linkCount, maxPossibleLinks, a1, a2
+      WHERE id(a1) < id(a2)
+      OPTIONAL MATCH (a1)-[r:RELATED_TO]-(a2)
+      
+      WITH linkCount, maxPossibleLinks, avg(r.confidence) as avgConfidence
+      
+      // Coherence = (linkDensity * 0.7) + (avgConfidence * 0.3)
+      RETURN 
+        CASE 
+          WHEN maxPossibleLinks = 0 THEN 1.0
+          ELSE (linkCount / maxPossibleLinks) * 0.7 + coalesce(avgConfidence, 0.5) * 0.3
+        END as coherenceScore
+    `;
+    
+    const result = await this.neo4jService.run(cypher, { groupId });
+    return result.length > 0 ? result[0].get('coherenceScore') : 1.0;
   }
 
   async addToContextGroup(groupId: string, recordId: string) {
@@ -96,6 +196,12 @@ export class GraphService {
       SET g.updatedAt = datetime()
     `;
     await this.neo4jService.run(cypher, { groupId, recordId });
+    
+    // Update group metadata
+    await this.updateGroupMetadata(groupId);
+    
+    // Check if group needs splitting after adding new member
+    await this.checkAndSplitGroup(groupId);
   }
 
   async mergeContextGroups(targetGroupId: string, sourceGroupId: string) {
@@ -111,6 +217,152 @@ export class GraphService {
       DETACH DELETE source
     `;
     await this.neo4jService.run(cypher, { targetGroupId, sourceGroupId });
+    
+    // Recalculate metadata for merged group
+    await this.updateGroupMetadata(targetGroupId);
+    
+    // Check if merged group needs splitting
+    await this.checkAndSplitGroup(targetGroupId);
+  }
+
+  async checkAndSplitGroup(groupId: string): Promise<string[]> {
+    const coherenceScore = await this.calculateCoherenceScore(groupId);
+    
+    // If coherence is below threshold, consider splitting
+    const COHERENCE_THRESHOLD = 0.4;
+    const MIN_GROUP_SIZE = 5;
+    
+    if (coherenceScore >= COHERENCE_THRESHOLD) {
+      return []; // No split needed
+    }
+    
+    // Get group size
+    const sizeCypher = `
+      MATCH (g:ContextGroup {id: $groupId})<-[:BELONGS_TO]-(a:Artifact)
+      RETURN count(a) as size
+    `;
+    const sizeResult = await this.neo4jService.run(sizeCypher, { groupId });
+    const groupSize = sizeResult[0]?.get('size') || 0;
+    
+    if (groupSize < MIN_GROUP_SIZE) {
+      return []; // Too small to split
+    }
+    
+    this.logger.log(`Group ${groupId} has low coherence (${coherenceScore.toFixed(2)}). Attempting split...`);
+    
+    // Use community detection to find natural clusters
+    return await this.splitGroupByCommunities(groupId);
+  }
+
+  private async splitGroupByCommunities(groupId: string): Promise<string[]> {
+    // Get all artifacts and their relationships within the group
+    const cypher = `
+      MATCH (g:ContextGroup {id: $groupId})<-[:BELONGS_TO]-(a:Artifact)
+      WITH g, collect(a) as artifacts
+      
+      // Find weakly connected components within the group
+      UNWIND artifacts as a1
+      OPTIONAL MATCH path = (a1)-[:RELATED_TO*1..2]-(a2:Artifact)
+      WHERE a2 IN artifacts
+      
+      WITH a1, collect(DISTINCT a2) as connected
+      RETURN a1.id as artifactId, connected
+    `;
+    
+    const result = await this.neo4jService.run(cypher, { groupId });
+    
+    if (result.length < 2) return [];
+    
+    // Simple clustering: group artifacts by connectivity
+    const clusters = this.clusterArtifacts(result);
+    
+    if (clusters.length < 2) return [];
+    
+    this.logger.log(`Splitting group ${groupId} into ${clusters.length} communities`);
+    
+    // Create new groups for each cluster
+    const newGroupIds: string[] = [];
+    
+    for (let i = 0; i < clusters.length; i++) {
+      const cluster = clusters[i];
+      if (cluster.length < 2) continue; // Skip tiny clusters
+      
+      const newGroupId = crypto.randomUUID();
+      const createCypher = `
+        CREATE (g:ContextGroup {
+          id: $newGroupId,
+          name: $name,
+          createdAt: datetime(),
+          updatedAt: datetime(),
+          coherenceScore: 1.0,
+          topics: [],
+          status: 'active'
+        })
+      `;
+      
+      await this.neo4jService.run(createCypher, {
+        newGroupId,
+        name: `Split Group ${i + 1}`
+      });
+      
+      // Move artifacts to new group
+      for (const artifactId of cluster) {
+        const moveCypher = `
+          MATCH (a:Artifact {id: $artifactId})
+          MATCH (oldG:ContextGroup {id: $oldGroupId})
+          MATCH (newG:ContextGroup {id: $newGroupId})
+          
+          OPTIONAL MATCH (a)-[oldRel:BELONGS_TO]->(oldG)
+          DELETE oldRel
+          
+          MERGE (a)-[:BELONGS_TO {weight: 1.0}]->(newG)
+        `;
+        
+        await this.neo4jService.run(moveCypher, {
+          artifactId,
+          oldGroupId: groupId,
+          newGroupId
+        });
+      }
+      
+      // Update metadata for new group
+      await this.updateGroupMetadata(newGroupId);
+      newGroupIds.push(newGroupId);
+    }
+    
+    // Delete old group if empty
+    const deleteEmptyCypher = `
+      MATCH (g:ContextGroup {id: $groupId})
+      WHERE NOT EXISTS { MATCH (g)<-[:BELONGS_TO]-() }
+      DETACH DELETE g
+    `;
+    await this.neo4jService.run(deleteEmptyCypher, { groupId });
+    
+    return newGroupIds;
+  }
+
+  private clusterArtifacts(connectivityData: any[]): string[][] {
+    // Simple greedy clustering based on connectivity
+    const visited = new Set<string>();
+    const clusters: string[][] = [];
+    
+    for (const row of connectivityData) {
+      const artifactId = row.get('artifactId');
+      
+      if (visited.has(artifactId)) continue;
+      
+      const connected = row.get('connected') || [];
+      const cluster = [artifactId, ...connected.map((a: any) => a.properties?.id).filter(Boolean)];
+      
+      // Mark all as visited
+      cluster.forEach(id => visited.add(id));
+      
+      if (cluster.length > 0) {
+        clusters.push(cluster);
+      }
+    }
+    
+    return clusters;
   }
 
   async getRecordGroups(recordId: string): Promise<string[]> {
@@ -134,13 +386,19 @@ export class GraphService {
       ORDER BY g.updatedAt DESC
     `;
     const result = await this.neo4jService.run(cypher, { userId });
-    return result.map(r => ({
-      id: r.get('g').properties.id,
-      name: r.get('g').properties.name,
-      updatedAt: r.get('g').properties.updatedAt || r.get('g').properties.createdAt,
-      members: r.get('members').map((m: any) => ({
-        weight: m.rel.properties.weight || 1.0,
-        record: {
+    return result.map(r => {
+      const groupProps = r.get('g').properties;
+      return {
+        id: groupProps.id,
+        name: groupProps.name,
+        updatedAt: groupProps.updatedAt || groupProps.createdAt,
+        coherenceScore: groupProps.coherenceScore || 1.0,
+        topics: groupProps.topics || [],
+        status: groupProps.status || 'active',
+        memberCount: r.get('members').length,
+        members: r.get('members').map((m: any) => ({
+          weight: m.rel?.properties.weight || 1.0,
+          record: {
             id: m.node.properties.id,
             title: m.node.properties.title,
             externalId: m.node.properties.externalId,
@@ -151,9 +409,10 @@ export class GraphService {
             participants: m.node.properties.participants || [],
             metadata: m.node.properties.metadata ? JSON.parse(m.node.properties.metadata) : {},
             body: m.node.properties.body || '' 
-        }
-      }))
-    }));
+          }
+        }))
+      };
+    });
   }
 
   async findLinkingCandidates(recordId: string, userId: string, maxCandidates: number = 100): Promise<any[]> {

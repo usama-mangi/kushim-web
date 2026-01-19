@@ -70,8 +70,6 @@ model UnifiedRecord {
   
   linksAsSource Link[] @relation("SourceRecord")
   linksAsTarget Link[] @relation("TargetRecord")
-  
-  contextGroups ContextGroupMember[]
 
   @@index([userId, sourceId], name: "idx_records_user_source")
   @@index([sourcePlatform, artifactType], name: "idx_records_platform_type")
@@ -95,33 +93,6 @@ model Link {
   @@unique([sourceRecordId, targetRecordId])
   @@map("links")
 }
-
-model ContextGroup {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @map("user_id") @db.Uuid
-  name        String
-  description String?
-  status      String   @default("active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  members ContextGroupMember[]
-
-  @@map("context_groups")
-}
-
-model ContextGroupMember {
-  contextGroupId String @map("context_group_id") @db.Uuid
-  recordId       String @map("record_id") @db.Uuid
-  weight         Float  @default(1.0)
-
-  contextGroup ContextGroup  @relation(fields: [contextGroupId], references: [id])
-  record       UnifiedRecord @relation(fields: [recordId], references: [id])
-
-  @@id([contextGroupId, recordId])
-  @@map("context_group_members")
-}
-
 
 model ActivityLog {
   id        String   @id @default(uuid()) @db.Uuid
