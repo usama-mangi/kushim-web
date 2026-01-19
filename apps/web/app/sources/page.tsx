@@ -84,11 +84,10 @@ function SourcesContent() {
       const token = localStorage.getItem('token');
       await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ingestion/sources`,
-        { providerName: provider, credentials: formData },
+        { providerName: provider, credentials: {} },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setIsAddingSource(false);
-      setFormData({});
       fetchSources();
     } catch (error) {
       alert('Failed to add source');

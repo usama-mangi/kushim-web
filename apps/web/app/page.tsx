@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Database, RefreshCw, Activity, LogOut, Shield, 
   Search, Command, ExternalLink, Clock, User, Link as LinkIcon,
   X, ChevronRight, MessageSquare, UserPlus, CheckCircle2, AlertCircle,
-  Hash, Github, Slack, FileText, Send, MoreHorizontal
+  Hash, Github, Slack, FileText, Send, MoreHorizontal, Network
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -164,6 +164,9 @@ export default function AmbientFeed() {
           </button>
           <a href="/sources" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Data Sources">
             <Database className="w-6 h-6" />
+          </a>
+          <a href="/context" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Context Graph">
+            <Network className="w-6 h-6" />
           </a>
           <a href="/activity" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Audit Logs">
             <Activity className="w-6 h-6" />
