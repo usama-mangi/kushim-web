@@ -9,6 +9,7 @@ import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { EncryptionService } from '../common/encryption.service';
 import { AuditService } from '../audit/audit.service';
 import { RelationshipService } from '../records/relationship.service';
+import { GraphService } from '../records/graph.service';
 
 @Injectable()
 export class IngestionService {
@@ -21,6 +22,7 @@ export class IngestionService {
     private encryptionService: EncryptionService,
     private auditService: AuditService,
     private relationshipService: RelationshipService,
+    private graphService: GraphService,
   ) {
     this.adapters.set('github', new GithubAdapter());
     this.adapters.set('jira', new JiraAdapter());
@@ -113,6 +115,9 @@ export class IngestionService {
             checksum: normalized.checksum,
           },
         });
+
+        // Sync to Graph DB
+        await this.graphService.syncRecord(record);
 
         // Trigger relationship discovery
         await this.relationshipService.discoverRelationships(record);

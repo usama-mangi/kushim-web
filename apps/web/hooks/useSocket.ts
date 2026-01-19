@@ -7,7 +7,7 @@ export const useSocket = () => {
   const addRecord = useDashboardStore((state) => state.addRecord);
 
   useEffect(() => {
-    socketRef.current = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000');
+    socketRef.current = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
 
     socketRef.current.on('connect', () => {
       console.log('Connected to WebSocket');

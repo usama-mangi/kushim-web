@@ -29,7 +29,7 @@ function SourcesContent() {
       return;
     }
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/sources`, {
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ingestion/sources`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setSources(response.data);
@@ -68,7 +68,7 @@ function SourcesContent() {
     const token = localStorage.getItem('token');
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/oauth/${provider}/connect`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ingestion/oauth/${provider}/connect`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data.url) {
@@ -76,6 +76,36 @@ function SourcesContent() {
       }
     } catch (error) {
       alert('Failed to initiate connection');
+    }
+  };
+
+  const handleAddSource = async (provider: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ingestion/sources`,
+        { providerName: provider, credentials: formData },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setIsAddingSource(false);
+      setFormData({});
+      fetchSources();
+    } catch (error) {
+      alert('Failed to add source');
+    }
+  };
+
+  const handleDeleteSource = async (id: string) => {
+    if (!confirm('Are you sure you want to disconnect this source?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ingestion/sources/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      fetchSources();
+    } catch (error) {
+      alert('Failed to delete source');
     }
   };
 
@@ -172,13 +202,21 @@ function SourcesContent() {
                     <div className="text-slate-500">
                       Last sync: <span className="text-slate-300 font-medium">{source.lastSync ? new Date(source.lastSync).toLocaleString() : 'Never'}</span>
                     </div>
-                    <button 
-                       disabled
-                       className="text-slate-600 cursor-not-allowed flex items-center"
-                       title="OAuth managed"
-                    >
-                      <Shield className="w-3 h-3 mr-1.5" /> Managed
-                    </button>
+                    <div className="flex space-x-2">
+                        <button 
+                        disabled
+                        className="text-slate-600 cursor-not-allowed flex items-center"
+                        title="OAuth managed"
+                        >
+                        <Shield className="w-3 h-3 mr-1.5" /> Managed
+                        </button>
+                        <button 
+                        onClick={() => handleDeleteSource(source.id)}
+                        className="text-red-500 hover:text-red-400 font-bold transition flex items-center"
+                        >
+                        <X className="w-3 h-3 mr-1.5" /> Disconnect
+                        </button>
+                    </div>
                   </div>
                 </div>
               ))}

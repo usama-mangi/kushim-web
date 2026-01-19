@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { GraphService } from './graph.service';
 
 @Injectable()
 export class RecordsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private graphService: GraphService,
+  ) {}
 
   async findAll(
     params: { search?: string; source?: string; type?: string } = {},
@@ -47,16 +51,6 @@ export class RecordsService {
   }
 
   async findContextGroups(userId: string) {
-    return this.prisma.contextGroup.findMany({
-      where: { userId, status: 'active' },
-      include: {
-        members: {
-          include: {
-            record: true,
-          },
-        },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
+    return this.graphService.getContextGroups(userId);
   }
 }

@@ -45,10 +45,10 @@ export default function AmbientFeed() {
 
     try {
       const [recordsRes, groupsRes] = await Promise.all([
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/records`, {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/records`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/records/context-groups`, {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/records/context-groups`, {
           headers: { Authorization: `Bearer ${token}` },
         })
       ]);
@@ -88,12 +88,12 @@ export default function AmbientFeed() {
     setSyncing(true);
     try {
       const token = localStorage.getItem('token');
-      const sourcesRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/sources`, {
+      const sourcesRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ingestion/sources`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       
       await Promise.all(sourcesRes.data.map((source: any) => 
-        axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/ingestion/trigger/${source.id}`, {}, { headers: { Authorization: `Bearer ${token}` } })
+        axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ingestion/trigger/${source.id}`, {}, { headers: { Authorization: `Bearer ${token}` } })
       ));
       
       setTimeout(fetchData, 3000);
@@ -108,7 +108,7 @@ export default function AmbientFeed() {
     const token = localStorage.getItem('token');
     setActionLoading(true);
     try {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/actions/execute`, 
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/actions/execute`, 
         { command: cmd }, 
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -270,6 +270,47 @@ export default function AmbientFeed() {
                 </div>
               ))}
             </div>
+          ) : records.length > 0 ? (
+            <div className="max-w-4xl mx-auto space-y-8">
+               <div className="flex items-center space-x-3 mb-6">
+                  <div className="w-3 h-3 rounded-full bg-slate-700 z-10" />
+                  <h2 className="text-lg font-bold text-slate-300">Recent Stream</h2>
+                  <span className="text-xs text-slate-500">(No clusters detected yet)</span>
+               </div>
+               
+               <div className="grid grid-cols-1 gap-3 relative border-l border-slate-800 ml-1.5 pl-8">
+                  {records.map((record) => (
+                      <div 
+                        key={record.id}
+                        onClick={() => setSelectedArtifact(record)}
+                        className={cn(
+                          "bg-slate-900/40 border border-slate-800/50 rounded-xl p-4 flex items-start space-x-4 hover:bg-slate-800/50 hover:border-slate-700 transition cursor-pointer group relative overflow-hidden",
+                          selectedArtifact?.id === record.id && "border-indigo-500/50 bg-indigo-500/5"
+                        )}
+                      >
+                        <div className="p-2.5 bg-slate-950 rounded-lg text-slate-400 group-hover:text-indigo-400 border border-slate-800 group-hover:border-indigo-500/20 transition shadow-inner">
+                          {getPlatformIcon(record.sourcePlatform)}
+                        </div>
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition truncate pr-6">{record.title}</h3>
+                          <div className="flex items-center mt-2 space-x-4">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-950 rounded border border-slate-800">
+                              {record.sourcePlatform}
+                            </span>
+                            <span className="flex items-center text-[11px] text-slate-500">
+                              <User className="w-3 h-3 mr-1 opacity-50" />
+                              {record.author}
+                            </span>
+                            <span className="flex items-center text-[11px] text-slate-500">
+                              <Clock className="w-3 h-3 mr-1 opacity-50" />
+                              {new Date(record.timestamp).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                  ))}
+               </div>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-32 text-center">
               <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6 border border-slate-800 shadow-2xl">
@@ -279,7 +320,7 @@ export default function AmbientFeed() {
               <p className="text-slate-500 max-w-sm mx-auto text-sm leading-relaxed text-balance">
                 Connect your workspace tools to enable deterministic linking and watch Kushim assemble your work graph.
               </p>
-              <button onClick={handleSync} className="mt-8 px-6 py-2.5 bg-slate-900 border border-slate-800 rounded-full text-sm font-semibold hover:bg-slate-800 transition shadow-lg">
+              <button onClick={() => router.push('/sources')} className="mt-8 px-6 py-2.5 bg-slate-900 border border-slate-800 rounded-full text-sm font-semibold hover:bg-slate-800 transition shadow-lg">
                 Connect Data Sources
               </button>
             </div>
@@ -299,7 +340,16 @@ export default function AmbientFeed() {
                 <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
                   {getPlatformIcon(selectedArtifact.sourcePlatform)}
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{selectedArtifact.artifactType}</span>
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{selectedArtifact.artifactType}</span>
+                    <span 
+                        className="text-[9px] font-mono text-slate-600 cursor-pointer hover:text-indigo-400 transition" 
+                        onClick={() => {navigator.clipboard.writeText(selectedArtifact.externalId); alert('ID copied!')}}
+                        title="Click to copy External ID"
+                    >
+                        REF: {selectedArtifact.externalId}
+                    </span>
+                </div>
               </div>
               <button onClick={() => setDetailPanelOpen(false)} className="p-2 hover:bg-slate-800 rounded-full transition text-slate-500">
                 <X className="w-5 h-5" />
@@ -376,7 +426,7 @@ export default function AmbientFeed() {
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    const verbs = ['comment', 'assign', 'reply', 'close'];
+                    const verbs = ['comment', 'assign', 'reply', 'close', 'link'];
                     if (verbs.some(v => commandInput.toLowerCase().startsWith(v))) {
                       executeAction(commandInput);
                     }
@@ -424,6 +474,7 @@ export default function AmbientFeed() {
                         { icon: <MessageSquare className="w-4 h-4"/>, label: 'Comment on artifact', cmd: 'comment [id] [text]' },
                         { icon: <UserPlus className="w-4 h-4"/>, label: 'Assign to team member', cmd: 'assign [id] @user' },
                         { icon: <CheckCircle2 className="w-4 h-4"/>, label: 'Close ticket or PR', cmd: 'close [id]' },
+                        { icon: <LinkIcon className="w-4 h-4"/>, label: 'Manually link items', cmd: 'link [id1] [id2]' },
                         { icon: <RefreshCw className="w-4 h-4"/>, label: 'Trigger manual sync', cmd: 'sync' },
                       ].map(item => (
                         <div key={item.label} className="p-3 bg-slate-950/50 border border-slate-800 rounded-xl flex items-center space-x-3 hover:border-slate-700 transition cursor-pointer group">

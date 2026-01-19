@@ -16,7 +16,7 @@ export default function ForgotPasswordPage() {
     setError('');
     setLoading(true);
     try {
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/forgot-password`, {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/forgot-password`, {
         email,
       });
       setSubmitted(true);

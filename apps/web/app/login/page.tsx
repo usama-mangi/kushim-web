@@ -36,7 +36,7 @@ function LoginContent() {
     setError('');
     setLoading(true);
     try {
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/login`, {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/login`, {
         email,
         password,
       });
@@ -61,7 +61,7 @@ function LoginContent() {
     setLoading(true);
     try {
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/mfa/login`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/mfa/login`,
         { token: otp },
         { headers: { Authorization: `Bearer ${tempToken}` } }
       );
@@ -75,7 +75,7 @@ function LoginContent() {
   };
 
   const handleSocialLogin = (provider: string) => {
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/${provider}`;
+    window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/${provider}`;
   };
 
   return (
@@ -121,7 +121,7 @@ function LoginContent() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Password</label>
-                  <Link href="/forgot-password" resentment className="text-[10px] font-bold text-indigo-500 hover:text-indigo-400 uppercase tracking-widest transition">Forgot?</Link>
+                  <Link href="/forgot-password" className="text-[10px] font-bold text-indigo-500 hover:text-indigo-400 uppercase tracking-widest transition">Forgot?</Link>
                 </div>
                 <div className="relative group">
                   <Lock className="absolute left-4 top-3.5 h-5 w-5 text-slate-600 group-focus-within:text-indigo-500 transition" />

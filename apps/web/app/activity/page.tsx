@@ -29,7 +29,7 @@ export default function ActivityPage() {
 
     const fetchLogs = async () => {
       try {
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/audit`, {
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/audit`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setLogs(response.data);

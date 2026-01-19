@@ -33,6 +33,7 @@ interface DashboardState {
   isCommandBarOpen: boolean;
   
   setRecords: (records: Artifact[]) => void;
+  addRecord: (record: Artifact) => void;
   setContextGroups: (groups: ContextGroup[]) => void;
   setSelectedArtifact: (artifact: Artifact | null) => void;
   setDetailPanelOpen: (isOpen: boolean) => void;
@@ -47,6 +48,12 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   isCommandBarOpen: false,
 
   setRecords: (records) => set({ records }),
+  addRecord: (record) => set((state) => {
+    if (state.records.some(r => r.id === record.id)) {
+        return state; // Duplicate, ignore
+    }
+    return { records: [record, ...state.records] };
+  }),
   setContextGroups: (contextGroups) => set({ contextGroups }),
   setSelectedArtifact: (selectedArtifact) => set({ selectedArtifact, isDetailPanelOpen: !!selectedArtifact }),
   setDetailPanelOpen: (isDetailPanelOpen) => set({ isDetailPanelOpen }),

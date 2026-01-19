@@ -10,73 +10,80 @@ export class JiraAdapter extends BaseAdapter {
   async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
     if (!credentials?.host && !credentials?.cloudId) {
        // OAuth flow might return cloudId or we might need to fetch resources accessible
-       // For now, let's assume host is still provided or discovered.
-       // Actually, with Jira OAuth (3LO), you query https://api.atlassian.com/ex/jira/{cloudId}/...
-       // The current adapter assumes 'host' is passed.
     }
 
-    let authentication: any;
-
-    if (credentials.accessToken) {
-      authentication = {
-        oauth2: {
-          accessToken: credentials.accessToken,
-        },
-      };
-    } else if (credentials.email && credentials.apiToken) {
-      authentication = {
-        basic: {
-          email: credentials.email,
-          apiToken: credentials.apiToken,
-        },
-      };
-    } else {
-      throw new Error('Jira credentials (accessToken OR email+apiToken) are required');
-    }
-
-    // If using OAuth, host might need to be constructed differently or passed in credentials
-    // Jira Cloud OAuth usually uses `https://api.atlassian.com/ex/jira/${cloudId}`
-    // We will assume for now that if OAuth is used, the 'host' field in credentials is set to the API URL
-    // or we handle it in the adapter. 
-    // Simplified for this task: allow existing host config.
+    const token = credentials.accessToken;
+    const email = credentials.email;
+    const apiToken = credentials.apiToken;
 
     if (!credentials.host) {
         throw new Error('Jira Host is required');
     }
 
-    const client = new Version3Client({
-      host: credentials.host,
-      authentication,
-    });
-
     try {
-      let jql = 'order by updated DESC';
+      // Jira's new /search/jql endpoint requires bounded queries.
+      // We'll add a default restriction of 'updated >= -30d' if no lastSync is provided.
+      let jql = 'updated >= -30d order by updated DESC';
       if (lastSync) {
-        // Jira JQL uses yyyy-MM-dd HH:mm or similar
-        const dateStr = lastSync
-          .toISOString()
-          .replace('T', ' ')
-          .substring(0, 16);
-        jql = `updated >= "${dateStr}" ${jql}`;
+        const dateStr = lastSync.toISOString().replace('T', ' ').substring(0, 16);
+        jql = `updated >= "${dateStr}" order by updated DESC`;
       }
 
-      const search = await client.issueSearch.searchForIssuesUsingJql({
-        jql,
-        maxResults: 50,
-        fields: [
-          'summary',
-          'description',
-          'status',
-          'priority',
-          'project',
-          'created',
-          'updated',
-          'creator',
-          'assignee',
-          'reporter',
-        ],
+      // Construct URL manually to ensure it's correct for OAuth vs Basic
+      // credentials.host is like https://api.atlassian.com/ex/jira/{cloudId} for OAuth
+      // or https://domain.atlassian.net for Basic
+      
+      // Update: /rest/api/3/search (POST) is deprecated/removed for some contexts. 
+      // Error message explicitly requested migration to /rest/api/3/search/jql
+      const searchUrl = `${credentials.host}/rest/api/3/search/jql`;
+
+      
+      const headers: any = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else if (email && apiToken) {
+        const auth = Buffer.from(`${email}:${apiToken}`).toString('base64');
+        headers['Authorization'] = `Basic ${auth}`;
+      } else {
+        throw new Error('No valid credentials provided');
+      }
+
+      console.log(`Fetching Jira: ${searchUrl} with JQL: ${jql}`);
+
+      const response = await fetch(searchUrl, {
+        method: 'POST', // Use POST for search to avoid query string length limits and encoding issues
+        headers,
+        body: JSON.stringify({
+          jql,
+          maxResults: 50,
+          fields: [
+            'summary',
+            'description',
+            'status',
+            'priority',
+            'project',
+            'created',
+            'updated',
+            'creator',
+            'assignee',
+            'reporter',
+          ],
+        }),
       });
-      return search.issues || [];
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`Jira API Error ${response.status}: ${errText}`);
+        throw new Error(`Jira API Request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data: any = await response.json();
+      return data.issues || [];
+
     } catch (error) {
       console.error('Jira API Error:', error);
       throw new Error('Failed to fetch data from Jira');

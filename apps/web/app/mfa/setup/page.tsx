@@ -23,7 +23,7 @@ export default function MfaSetupPage() {
 
         // Check status first
         const statusRes = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/mfa/status`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/mfa/status`,
           { headers: { Authorization: `Bearer ${authToken}` } }
         );
 
@@ -32,7 +32,7 @@ export default function MfaSetupPage() {
         } else {
           // If not enabled, generate new secret
           const response = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/mfa/generate`,
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/mfa/generate`,
             {},
             { headers: { Authorization: `Bearer ${authToken}` } }
           );
@@ -51,7 +51,7 @@ export default function MfaSetupPage() {
     try {
       const authToken = localStorage.getItem('token');
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/auth/mfa/verify`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/mfa/verify`,
         { token },
         { headers: { Authorization: `Bearer ${authToken}` } }
       );

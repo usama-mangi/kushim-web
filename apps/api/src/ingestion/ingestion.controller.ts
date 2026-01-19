@@ -5,6 +5,7 @@ import {
   UseGuards,
   Get,
   Patch,
+  Delete,
   Body,
   Request,
 } from '@nestjs/common';
@@ -25,6 +26,29 @@ export class IngestionController {
     private encryptionService: EncryptionService,
     private ingestionService: IngestionService,
   ) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('sources/:id')
+  async deleteSource(@Request() req: any, @Param('id') id: string) {
+    // Ensure the source belongs to the user
+    const count = await this.prisma.dataSource.count({
+      where: { id, userId: req.user.userId },
+    });
+    
+    if (count === 0) {
+      throw new Error('Source not found or access denied');
+    }
+
+    // Delete associated records first (Postgres constraint)
+    // Ideally this should also clean up from Graph DB, but for now lets fix the 500 error.
+    await this.prisma.unifiedRecord.deleteMany({
+      where: { sourceId: id },
+    });
+
+    return this.prisma.dataSource.delete({
+      where: { id },
+    });
+  }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'USER')

@@ -85,35 +85,62 @@ export class OAuthService {
     const clientId = process.env.GITHUB_CLIENT_ID;
     if (!clientId) throw new Error('GITHUB_CLIENT_ID not configured');
     
-    const redirectUri = process.env.GITHUB_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/github/callback';
-    const scopes = ['repo', 'user:email']; // Adjust scopes as needed
+    const redirectUri = process.env.GITHUB_CALLBACK_URL || 'http://localhost:3001/api/ingestion/oauth/github/callback';
+    const scopes = ['repo', 'user:email'];
 
-    return `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=${scopes.join(' ')}&state=${state}`;
+    const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        scope: scopes.join(' '),
+        state: state
+    });
+
+    return `https://github.com/login/oauth/authorize?${params.toString()}`;
   }
 
   private getJiraAuthUrl(state: string): string {
     const clientId = process.env.JIRA_CLIENT_ID;
     if (!clientId) throw new Error('JIRA_CLIENT_ID not configured');
     
-    const redirectUri = process.env.JIRA_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/jira/callback';
-    const scopes = ['read:jira-work', 'read:jira-user', 'offline_access']; // Adjust scopes
+    const redirectUri = process.env.JIRA_CALLBACK_URL || 'http://localhost:3001/api/ingestion/oauth/jira/callback';
+    const scopes = ['read:jira-work', 'read:jira-user', 'offline_access'];
 
-    return `https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id=${clientId}&scope=${scopes.join('%20')}&redirect_uri=${redirectUri}&state=${state}&response_type=code&prompt=consent`;
+    const params = new URLSearchParams({
+        audience: 'api.atlassian.com',
+        client_id: clientId,
+        scope: scopes.join(' '), 
+        redirect_uri: redirectUri,
+        state: state,
+        response_type: 'code',
+        prompt: 'consent'
+    });
+
+    // Atlassian can be strict about %20 vs + for spaces in scopes
+    const query = params.toString().replace(/\+/g, '%20');
+
+    return `https://auth.atlassian.com/authorize?${query}`;
   }
 
   private getSlackAuthUrl(state: string): string {
     const clientId = process.env.SLACK_CLIENT_ID;
     if (!clientId) throw new Error('SLACK_CLIENT_ID not configured');
     
-    const redirectUri = process.env.SLACK_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/slack/callback';
-    const scopes = ['channels:read', 'channels:history', 'chat:write', 'files:read', 'stars:read']; 
+    const redirectUri = process.env.SLACK_CALLBACK_URL || 'http://localhost:3001/api/ingestion/oauth/slack/callback';
+    const scopes = ['channels:read', 'channels:history', 'chat:write', 'files:read', 'stars:read'];
 
-    return `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=${scopes.join(',')}&redirect_uri=${redirectUri}&state=${state}`;
+    const params = new URLSearchParams({
+        client_id: clientId,
+        scope: scopes.join(','), // Slack uses comma separator
+        redirect_uri: redirectUri,
+        state: state
+    });
+
+    return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
   }
 
   private getGoogleAuthUrl(state: string): string {
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    const redirectUri = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/google/callback';
+    const redirectUri = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3001/api/ingestion/oauth/google/callback';
     
     if (!clientId) throw new Error('GOOGLE_CLIENT_ID not configured');
 
@@ -124,13 +151,23 @@ export class OAuthService {
         'profile'
     ];
 
-    return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scopes.join(' ')}&state=${state}&access_type=offline&prompt=consent`;
+    const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: scopes.join(' '),
+        state: state,
+        access_type: 'offline',
+        prompt: 'consent'
+    });
+
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
 
   private async exchangeGoogleToken(code: string): Promise<any> {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/google/callback';
+    const redirectUri = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3001/api/ingestion/oauth/google/callback';
 
     if (!clientId || !clientSecret) throw new Error('Google credentials not configured');
 
@@ -187,7 +224,7 @@ export class OAuthService {
   private async exchangeJiraToken(code: string): Promise<any> {
     const clientId = process.env.JIRA_CLIENT_ID;
     const clientSecret = process.env.JIRA_CLIENT_SECRET;
-    const redirectUri = process.env.JIRA_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/jira/callback';
+    const redirectUri = process.env.JIRA_CALLBACK_URL || 'http://localhost:3001/api/ingestion/oauth/jira/callback';
 
     if (!clientId || !clientSecret) throw new Error('Jira credentials not configured');
 
@@ -221,6 +258,8 @@ export class OAuthService {
     }
 
     const resources = await resourcesResponse.json();
+    this.logger.log(`Jira Accessible Resources: ${JSON.stringify(resources)}`);
+
     if (resources.length === 0) {
       throw new Error('No Jira resources accessible');
     }
@@ -241,7 +280,7 @@ export class OAuthService {
   private async exchangeSlackToken(code: string): Promise<any> {
     const clientId = process.env.SLACK_CLIENT_ID;
     const clientSecret = process.env.SLACK_CLIENT_SECRET;
-    const redirectUri = process.env.SLACK_CALLBACK_URL || 'http://localhost:3000/api/ingestion/oauth/slack/callback';
+    const redirectUri = process.env.SLACK_CALLBACK_URL || 'http://localhost:3001/api/ingestion/oauth/slack/callback';
 
     if (!clientId || !clientSecret) throw new Error('Slack credentials not configured');
 
