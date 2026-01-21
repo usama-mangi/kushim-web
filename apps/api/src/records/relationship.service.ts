@@ -9,6 +9,11 @@ import { TfIdfService } from '../common/tfidf.service';
 export class RelationshipService {
   private readonly logger = new Logger(RelationshipService.name);
 
+  // ML Specs Phase 3: Production thresholds
+  private readonly DETERMINISTIC_THRESHOLD = 0.7;
+  private readonly ML_THRESHOLD = 0.75; // Higher threshold for ML-only links (precision first)
+  private readonly ML_ENABLED = true; // Feature flag for rollback
+
   constructor(
     private prisma: PrismaService,
     private mlScoringService: MLScoringService,
@@ -25,13 +30,82 @@ export class RelationshipService {
     );
 
     for (const candidate of candidates) {
-      const score = await this.calculateLinkScoreOptimized(newRecord, candidate);
+      const deterministicScore = await this.calculateLinkScoreOptimized(newRecord, candidate);
 
-      // Trigger shadow ML scoring regardless of deterministic threshold
-      this.mlScoringService.runShadowScoring(newRecord, candidate, score);
+      // Calculate ML score (hybrid: deterministic + semantic + structural)
+      const mlScoreResult = await this.mlScoringService.calculateMLScore(
+        newRecord,
+        candidate,
+        deterministicScore,
+      );
 
-      if (score >= 0.7) {
-        await this.createLink(newRecord, candidate, score);
+      // Hybrid decision logic (ML Specs Phase 3)
+      let shouldCreateLink = false;
+      let finalScore = deterministicScore;
+      let discoveryMethod = 'deterministic';
+      let explanation = {};
+
+      if (deterministicScore >= this.DETERMINISTIC_THRESHOLD) {
+        // Deterministic link (existing behavior)
+        shouldCreateLink = true;
+        finalScore = deterministicScore;
+        discoveryMethod = 'deterministic';
+        explanation = {
+          deterministicScore,
+          mlScore: mlScoreResult.mlScore,
+          method: 'deterministic',
+          reason: 'Deterministic signals exceeded threshold',
+        };
+      } else if (
+        this.ML_ENABLED &&
+        mlScoreResult.mlScore >= this.ML_THRESHOLD
+      ) {
+        // ML-assisted link (new behavior)
+        shouldCreateLink = true;
+        finalScore = mlScoreResult.mlScore;
+        discoveryMethod = 'ml_assisted';
+        explanation = {
+          deterministicScore,
+          mlScore: mlScoreResult.mlScore,
+          semanticScore: mlScoreResult.semanticScore,
+          structuralScore: mlScoreResult.structuralScore,
+          method: 'ml_assisted',
+          reason: 'ML scoring exceeded threshold',
+        };
+        this.logger.log(
+          `ML-assisted link: ${newRecord.externalId} <-> ${candidate.externalId} ` +
+          `(ML: ${mlScoreResult.mlScore.toFixed(2)}, Det: ${deterministicScore.toFixed(2)})`,
+        );
+      } else {
+        // No link created, but log shadow score for analysis
+        explanation = {
+          deterministicScore,
+          mlScore: mlScoreResult.mlScore,
+          semanticScore: mlScoreResult.semanticScore,
+          structuralScore: mlScoreResult.structuralScore,
+          method: 'rejected',
+          reason: 'Below both thresholds',
+        };
+      }
+
+      // Always persist shadow link for evaluation
+      await this.mlScoringService.persistShadowLink(
+        newRecord.id,
+        candidate.id,
+        deterministicScore,
+        mlScoreResult.semanticScore,
+        mlScoreResult.structuralScore,
+        mlScoreResult.mlScore,
+      );
+
+      if (shouldCreateLink) {
+        await this.createLink(
+          newRecord,
+          candidate,
+          finalScore,
+          discoveryMethod,
+          explanation,
+        );
         await this.updateContextGroups(newRecord, candidate);
       }
     }
@@ -156,7 +230,13 @@ export class RelationshipService {
     return { success: true };
   }
 
-  private async createLink(a: UnifiedRecord, b: UnifiedRecord, score: number) {
+  private async createLink(
+    a: UnifiedRecord,
+    b: UnifiedRecord,
+    score: number,
+    discoveryMethod: string = 'deterministic',
+    explanation: any = {},
+  ) {
     const [sourceId, targetId] =
       a.timestamp < b.timestamp ? [a.id, b.id] : [b.id, a.id];
 
@@ -169,13 +249,16 @@ export class RelationshipService {
       },
       update: {
         confidenceScore: score,
+        discoveryMethod,
+        metadata: explanation,
       },
       create: {
         sourceRecordId: sourceId,
         targetRecordId: targetId,
         confidenceScore: score,
-        relationshipType: score >= 0.85 ? 'strong_contextual' : 'explicit',
-        discoveryMethod: 'deterministic',
+        relationshipType: score >= 0.85 ? 'strong_contextual' : 'weak_contextual',
+        discoveryMethod,
+        metadata: explanation,
       },
     });
 

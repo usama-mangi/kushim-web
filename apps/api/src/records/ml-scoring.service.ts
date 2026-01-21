@@ -49,6 +49,40 @@ export class MLScoringService {
     }
   }
 
+  async calculateMLScore(
+    a: UnifiedRecord,
+    b: UnifiedRecord,
+    deterministicScore: number,
+  ): Promise<{
+    mlScore: number;
+    semanticScore: number;
+    structuralScore: number;
+  }> {
+    try {
+      const semanticScore = await this.calculateSemanticSimilarity(a, b);
+      const structuralScore = this.calculateStructuralFeatures(a, b);
+
+      const mlScore =
+        this.ALPHA * deterministicScore +
+        this.BETA * semanticScore +
+        this.GAMMA * structuralScore;
+
+      return {
+        mlScore,
+        semanticScore,
+        structuralScore,
+      };
+    } catch (error) {
+      this.logger.error('ML score calculation failed', error);
+      // Return conservative scores on error
+      return {
+        mlScore: deterministicScore * this.ALPHA,
+        semanticScore: 0,
+        structuralScore: 0.5,
+      };
+    }
+  }
+
   private async calculateSemanticSimilarity(
     a: UnifiedRecord,
     b: UnifiedRecord,
@@ -184,7 +218,7 @@ export class MLScoringService {
     return 0.5;
   }
 
-  private async persistShadowLink(
+  async persistShadowLink(
     sourceRecordId: string,
     targetRecordId: string,
     deterministicScore: number,
