@@ -64,6 +64,7 @@ model UnifiedRecord {
   participants   String[]
   metadata       Json
   checksum       String   @unique
+  embedding      Json?    @map("embedding")
 
   user   User       @relation(fields: [userId], references: [id])
   source DataSource @relation(fields: [sourceId], references: [id])
@@ -92,6 +93,22 @@ model Link {
 
   @@unique([sourceRecordId, targetRecordId])
   @@map("links")
+}
+
+model ShadowLink {
+  id                   String   @id @default(uuid()) @db.Uuid
+  sourceRecordId       String   @map("source_record_id") @db.Uuid
+  targetRecordId       String   @map("target_record_id") @db.Uuid
+  deterministicScore   Float    @map("deterministic_score")
+  semanticScore        Float    @map("semantic_score")
+  structuralScore      Float    @map("structural_score")
+  mlScore              Float    @map("ml_score")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@unique([sourceRecordId, targetRecordId])
+  @@index([mlScore], name: "idx_shadow_links_ml_score")
+  @@index([createdAt], name: "idx_shadow_links_created")
+  @@map("shadow_links")
 }
 
 model ActivityLog {

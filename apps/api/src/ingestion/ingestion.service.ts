@@ -7,6 +7,7 @@ import { GoogleAdapter } from './adapters/google.adapter';
 import { BaseAdapter } from './adapters/base.adapter';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { EncryptionService } from '../common/encryption.service';
+import { EmbeddingService } from '../common/embedding.service';
 import { AuditService } from '../audit/audit.service';
 import { RelationshipService } from '../records/relationship.service';
 import { GraphService } from '../records/graph.service';
@@ -20,6 +21,7 @@ export class IngestionService {
     private prisma: PrismaService,
     private notificationsGateway: NotificationsGateway,
     private encryptionService: EncryptionService,
+    private embeddingService: EmbeddingService,
     private auditService: AuditService,
     private relationshipService: RelationshipService,
     private graphService: GraphService,
@@ -85,6 +87,17 @@ export class IngestionService {
       for (const raw of rawData) {
         const normalized = adapter.normalize(raw);
 
+        // Generate embedding for the record
+        let embedding: number[] | null = null;
+        try {
+          embedding = await this.embeddingService.generateEmbeddingForRecord(
+            normalized.title,
+            normalized.body,
+          );
+        } catch (error) {
+          this.logger.warn(`Failed to generate embedding for ${normalized.externalId}`, error);
+        }
+
         const record = await this.prisma.unifiedRecord.upsert({
           where: { checksum: normalized.checksum },
           update: {
@@ -98,6 +111,7 @@ export class IngestionService {
             timestamp: normalized.timestamp,
             participants: normalized.participants,
             metadata: normalized.metadata,
+            embedding: embedding ? JSON.parse(JSON.stringify(embedding)) : null,
           },
           create: {
             userId: dataSource.userId,
@@ -113,6 +127,7 @@ export class IngestionService {
             participants: normalized.participants,
             metadata: normalized.metadata,
             checksum: normalized.checksum,
+            embedding: embedding ? JSON.parse(JSON.stringify(embedding)) : null,
           },
         });
 
