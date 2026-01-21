@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Neo4jService } from '../neo4j/neo4j.service';
 import { UnifiedRecord, Link } from '@prisma/client';
+import neo4j from 'neo4j-driver';
 
 @Injectable()
 export class GraphService {
@@ -374,6 +375,47 @@ export class GraphService {
     return result.map(r => r.get('id'));
   }
 
+  async deleteContextGroup(groupId: string) {
+    const cypher = `
+      MATCH (g:ContextGroup {id: $groupId})
+      DETACH DELETE g
+    `;
+    await this.neo4jService.run(cypher, { groupId });
+    this.logger.log(`Deleted context group ${groupId}`);
+  }
+
+  async renameContextGroup(groupId: string, newName: string) {
+    const cypher = `
+      MATCH (g:ContextGroup {id: $groupId})
+      SET g.name = $newName, g.updatedAt = datetime()
+      RETURN g
+    `;
+    await this.neo4jService.run(cypher, { groupId, newName });
+    this.logger.log(`Renamed context group ${groupId} to "${newName}"`);
+  }
+
+  async removeFromContextGroup(groupId: string, recordId: string) {
+    const cypher = `
+      MATCH (a:Artifact {id: $recordId})-[r:BELONGS_TO]->(g:ContextGroup {id: $groupId})
+      DELETE r
+      SET g.updatedAt = datetime()
+    `;
+    await this.neo4jService.run(cypher, { groupId, recordId });
+    
+    // Update group metadata after removal
+    await this.updateGroupMetadata(groupId);
+    
+    // Delete group if empty
+    const deleteEmptyCypher = `
+      MATCH (g:ContextGroup {id: $groupId})
+      WHERE NOT EXISTS { MATCH (g)<-[:BELONGS_TO]-() }
+      DETACH DELETE g
+    `;
+    await this.neo4jService.run(deleteEmptyCypher, { groupId });
+    
+    this.logger.log(`Removed artifact ${recordId} from group ${groupId}`);
+  }
+
   async getContextGroups(userId: string) {
     const cypher = `
       MATCH (g:ContextGroup)
@@ -433,7 +475,7 @@ export class GraphService {
     const result = await this.neo4jService.run(cypher, { 
       recordId, 
       userId,
-      maxCandidates 
+      maxCandidates: neo4j.int(maxCandidates) // Convert to Neo4j integer type
     });
 
     return result.map(r => {
@@ -509,6 +551,18 @@ export class GraphService {
       hasSharedMetadata: sharedKeys.length > 0,
       sharedMetadataKeys: sharedKeys
     };
+  }
+
+  async deleteArtifact(externalIdOrId: string) {
+    // Delete artifact and all its relationships (both incoming and outgoing)
+    const cypher = `
+      MATCH (a:Artifact)
+      WHERE a.id = $identifier OR a.externalId = $identifier
+      DETACH DELETE a
+    `;
+    
+    await this.neo4jService.run(cypher, { identifier: externalIdOrId });
+    this.logger.log(`Deleted artifact ${externalIdOrId} from Neo4j`);
   }
 }
 

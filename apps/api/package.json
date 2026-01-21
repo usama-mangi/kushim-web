@@ -101,6 +101,9 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(octokit|@slack/web-api|jira.js|googleapis)/)"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

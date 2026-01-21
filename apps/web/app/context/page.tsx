@@ -6,10 +6,12 @@ import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, Database, Activity, LogOut, Shield,
-  Network, Layers, TrendingUp, Info
+  Network, Layers, TrendingUp, Info, Plus
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import CreateGroupModal from '../components/CreateGroupModal';
+import ContextGroupManager from '../components/ContextGroupManager';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -57,6 +59,7 @@ function ContextContent() {
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [graphLoading, setGraphLoading] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const router = useRouter();
 
   const fetchContextGroups = async () => {
@@ -123,6 +126,19 @@ function ContextContent() {
     router.push('/login');
   };
 
+  const handleGroupUpdated = () => {
+    console.log('[Context Page] Refreshing after group update');
+    fetchContextGroups();
+    fetchGraphData(selectedGroup || undefined);
+  };
+
+  const handleGroupDeleted = () => {
+    console.log('[Context Page] Group deleted, clearing selection');
+    setSelectedGroup(null);
+    fetchContextGroups();
+    fetchGraphData();
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950">
@@ -164,13 +180,23 @@ function ContextContent() {
 
       {/* Context Groups Sidebar */}
       <aside className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col">
-        <header className="h-20 border-b border-slate-800 flex items-center px-6">
+        <header className="h-20 border-b border-slate-800 flex items-center justify-between px-6">
           <div>
             <h2 className="text-lg font-bold text-white">Context Groups</h2>
             <p className="text-xs text-slate-500 font-medium uppercase tracking-widest mt-0.5">
               {contextGroups.length} Active
             </p>
           </div>
+          <button
+            onClick={() => {
+              console.log('[Context Page] Opening create group modal');
+              setShowCreateModal(true);
+            }}
+            className="p-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors"
+            title="Create new group"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -191,44 +217,56 @@ function ContextContent() {
           </button>
 
           {contextGroups.map((group) => (
-            <button
-              key={group.id}
-              onClick={() => setSelectedGroup(group.id)}
-              className={cn(
-                "w-full p-4 rounded-xl border transition-all text-left",
-                selectedGroup === group.id
-                  ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
-                  : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300"
-              )}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-bold text-sm">{group.name}</h3>
-                <div className="flex items-center text-xs text-slate-500">
-                  <Network className="w-3 h-3 mr-1" />
-                  {group.artifactCount}
+            <div key={group.id} className="space-y-2">
+              <button
+                onClick={() => setSelectedGroup(group.id)}
+                className={cn(
+                  "w-full p-4 rounded-xl border transition-all text-left",
+                  selectedGroup === group.id
+                    ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                    : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-300"
+                )}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-sm">{group.name}</h3>
+                  <div className="flex items-center text-xs text-slate-500">
+                    <Network className="w-3 h-3 mr-1" />
+                    {group.artifactCount}
+                  </div>
                 </div>
-              </div>
 
-              {group.topics && group.topics.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {group.topics.slice(0, 3).map((topic, idx) => (
-                    <span key={idx} className="px-2 py-0.5 bg-slate-800 rounded text-[10px] text-slate-400">
-                      {topic}
+                {group.topics && group.topics.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {group.topics.slice(0, 3).map((topic, idx) => (
+                      <span key={idx} className="px-2 py-0.5 bg-slate-800 rounded text-[10px] text-slate-400">
+                        {topic}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {group.coherenceScore !== undefined && (
+                  <div className="flex items-center text-xs">
+                    <TrendingUp className="w-3 h-3 mr-1 text-green-500" />
+                    <span className="text-slate-500">Coherence:</span>
+                    <span className="ml-1 font-semibold text-green-400">
+                      {(group.coherenceScore * 100).toFixed(0)}%
                     </span>
-                  ))}
+                  </div>
+                )}
+              </button>
+              
+              {selectedGroup === group.id && (
+                <div className="px-2">
+                  <ContextGroupManager
+                    group={group}
+                    onUpdate={handleGroupUpdated}
+                    onDelete={handleGroupDeleted}
+                    allGroups={contextGroups}
+                  />
                 </div>
               )}
-
-              {group.coherenceScore !== undefined && (
-                <div className="flex items-center text-xs">
-                  <TrendingUp className="w-3 h-3 mr-1 text-green-500" />
-                  <span className="text-slate-500">Coherence:</span>
-                  <span className="ml-1 font-semibold text-green-400">
-                    {(group.coherenceScore * 100).toFixed(0)}%
-                  </span>
-                </div>
-              )}
-            </button>
+            </div>
           ))}
 
           {contextGroups.length === 0 && (
@@ -290,6 +328,14 @@ function ContextContent() {
           )}
         </main>
       </div>
+
+      {/* Create Group Modal */}
+      {showCreateModal && (
+        <CreateGroupModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={handleGroupUpdated}
+        />
+      )}
     </div>
   );
 }

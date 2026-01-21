@@ -1,10 +1,13 @@
-import { Controller, Get, UseGuards, Param, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, UseGuards, Param, Request, Body, HttpCode, Logger } from '@nestjs/common';
 import { GraphService } from './graph.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Integer } from 'neo4j-driver';
+import { randomUUID } from 'crypto';
 
 @Controller('graph')
 export class GraphController {
+  private readonly logger = new Logger(GraphController.name);
+  
   constructor(private readonly graphService: GraphService) {}
 
   private toPlainObject(obj: any): any {
@@ -47,9 +50,9 @@ export class GraphController {
     const cypher = `
       MATCH (g:ContextGroup)
       OPTIONAL MATCH (g)<-[:BELONGS_TO]-(a:Artifact)
-      WHERE a.userId = $userId
+      WHERE a.userId = $userId OR a IS NULL
       WITH g, count(a) as artifactCount
-      WHERE artifactCount > 0
+      WHERE artifactCount >= 0
       RETURN g.id as id,
              g.name as name,
              artifactCount,
@@ -182,5 +185,132 @@ export class GraphController {
       nodes: result[0].get('nodes'),
       links: result[0].get('links')
     });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('context-groups')
+  async createContextGroup(
+    @Request() req: any,
+    @Body() body: { name: string; artifactIds?: string[] }
+  ) {
+    this.logger.log(`Creating context group: ${body.name} for user ${req.user.userId}`);
+    
+    if (!body.name) {
+      return { success: false, message: 'Group name is required' };
+    }
+
+    // Create empty group
+    const groupId = randomUUID();
+    const cypher = `
+      CREATE (g:ContextGroup {
+        id: $groupId,
+        name: $name,
+        createdAt: datetime(),
+        updatedAt: datetime(),
+        coherenceScore: 1.0,
+        topics: [],
+        status: 'active'
+      })
+      RETURN g.id as id
+    `;
+    
+    this.logger.log(`Executing cypher to create group ${groupId}`);
+    await this.graphService['neo4jService'].run(cypher, {
+      groupId,
+      name: body.name
+    });
+
+    // Add artifacts if provided
+    if (body.artifactIds && body.artifactIds.length > 0) {
+      for (const artifactId of body.artifactIds) {
+        await this.graphService.addToContextGroup(groupId, artifactId);
+      }
+    }
+
+    this.logger.log(`Successfully created context group ${groupId}`);
+    return { success: true, groupId, message: 'Context group created' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('context-groups/:id')
+  async updateContextGroup(
+    @Param('id') groupId: string,
+    @Body() body: { name?: string }
+  ) {
+    if (body.name) {
+      await this.graphService.renameContextGroup(groupId, body.name);
+    }
+    return { success: true, message: 'Context group updated' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('context-groups/:id')
+  @HttpCode(204)
+  async deleteContextGroup(@Param('id') groupId: string) {
+    await this.graphService.deleteContextGroup(groupId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('context-groups/:id/artifacts')
+  async addArtifactToGroup(
+    @Param('id') groupId: string,
+    @Body() body: { artifactId: string },
+    @Request() req: any
+  ) {
+    if (!body.artifactId) {
+      return { success: false, message: 'Artifact ID is required' };
+    }
+    
+    this.logger.log(`Adding artifact ${body.artifactId} to group ${groupId} for user ${req.user.userId}`);
+    
+    try {
+      await this.graphService.addToContextGroup(groupId, body.artifactId);
+      this.logger.log(`Successfully added artifact ${body.artifactId} to group ${groupId}`);
+      return { success: true, message: 'Artifact added to group' };
+    } catch (error) {
+      this.logger.error(`Failed to add artifact ${body.artifactId} to group ${groupId}`, error.stack);
+      return { success: false, message: error.message || 'Failed to add artifact to group' };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('context-groups/:id/artifacts/:artifactId')
+  @HttpCode(204)
+  async removeArtifactFromGroup(
+    @Param('id') groupId: string,
+    @Param('artifactId') artifactId: string
+  ) {
+    this.logger.log(`Removing artifact ${artifactId} from group ${groupId}`);
+    
+    try {
+      await this.graphService.removeFromContextGroup(groupId, artifactId);
+      this.logger.log(`Successfully removed artifact ${artifactId} from group ${groupId}`);
+    } catch (error) {
+      this.logger.error(`Failed to remove artifact ${artifactId} from group ${groupId}`, error.stack);
+      throw error;
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('context-groups/:id/merge')
+  async mergeGroups(
+    @Param('id') targetGroupId: string,
+    @Body() body: { sourceGroupId: string }
+  ) {
+    if (!body.sourceGroupId) {
+      return { success: false, message: 'Source group ID is required' };
+    }
+    await this.graphService.mergeContextGroups(targetGroupId, body.sourceGroupId);
+    return { success: true, message: 'Groups merged successfully' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('context-groups/:id/split')
+  async splitGroup(@Param('id') groupId: string) {
+    const newGroupIds = await this.graphService.checkAndSplitGroup(groupId);
+    if (newGroupIds.length === 0) {
+      return { success: false, message: 'Group coherence is good, no split needed' };
+    }
+    return { success: true, newGroupIds, message: `Group split into ${newGroupIds.length} new groups` };
   }
 }

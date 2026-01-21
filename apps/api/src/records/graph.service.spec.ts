@@ -334,4 +334,47 @@ describe('GraphService - Context Groups', () => {
       expect(groups[0].coherenceScore).toBe(0.85);
     });
   });
+
+  describe('deleteContextGroup', () => {
+    it('should delete a context group', async () => {
+      mockNeo4jRun.mockResolvedValueOnce([]);
+
+      await service.deleteContextGroup('group-1');
+
+      const deleteCall = mockNeo4jRun.mock.calls[0];
+      expect(deleteCall[0]).toContain('DETACH DELETE');
+      expect(deleteCall[1].groupId).toBe('group-1');
+    });
+  });
+
+  describe('renameContextGroup', () => {
+    it('should rename a context group', async () => {
+      mockNeo4jRun.mockResolvedValueOnce([{ get: () => ({}) }]);
+
+      await service.renameContextGroup('group-1', 'New Name');
+
+      const renameCall = mockNeo4jRun.mock.calls[0];
+      expect(renameCall[0]).toContain('SET g.name');
+      expect(renameCall[1].groupId).toBe('group-1');
+      expect(renameCall[1].newName).toBe('New Name');
+    });
+  });
+
+  describe('removeFromContextGroup', () => {
+    it('should remove artifact from group and update metadata', async () => {
+      mockNeo4jRun
+        .mockResolvedValueOnce([])  // remove relationship
+        .mockResolvedValueOnce([{ get: (key: string) => key === 'title' ? 'test' : 'body' }])  // updateGroupMetadata - get artifacts
+        .mockResolvedValueOnce([{ get: (key: string) => 0.8 }])  // calculateCoherenceScore
+        .mockResolvedValueOnce([])  // updateGroupMetadata - update query
+        .mockResolvedValueOnce([]);  // delete empty group
+
+      await service.removeFromContextGroup('group-1', 'artifact-1');
+
+      const removeCall = mockNeo4jRun.mock.calls[0];
+      expect(removeCall[0]).toContain('DELETE r');
+      expect(removeCall[1].groupId).toBe('group-1');
+      expect(removeCall[1].recordId).toBe('artifact-1');
+    });
+  });
 });

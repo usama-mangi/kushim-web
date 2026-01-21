@@ -17,6 +17,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../common/encryption.service';
 import { IngestionService } from './ingestion.service';
+import { GraphService } from '../records/graph.service';
 
 @Controller('ingestion')
 export class IngestionController {
@@ -25,6 +26,7 @@ export class IngestionController {
     private prisma: PrismaService,
     private encryptionService: EncryptionService,
     private ingestionService: IngestionService,
+    private graphService: GraphService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -39,12 +41,45 @@ export class IngestionController {
       throw new Error('Source not found or access denied');
     }
 
-    // Delete associated records first (Postgres constraint)
-    // Ideally this should also clean up from Graph DB, but for now lets fix the 500 error.
+    // Get all record IDs for this source (for Neo4j cleanup)
+    const records = await this.prisma.unifiedRecord.findMany({
+      where: { sourceId: id },
+      select: { id: true, externalId: true },
+    });
+
+    const recordIds = records.map(r => r.id);
+
+    // Step 1: Delete all Links (both source and target) from Postgres
+    if (recordIds.length > 0) {
+      await this.prisma.link.deleteMany({
+        where: {
+          OR: [
+            { sourceRecordId: { in: recordIds } },
+            { targetRecordId: { in: recordIds } },
+          ],
+        },
+      });
+    }
+
+    // Step 2: Delete all UnifiedRecords from Postgres
     await this.prisma.unifiedRecord.deleteMany({
       where: { sourceId: id },
     });
 
+    // Step 3: Clean up Neo4j graph (delete artifacts and their relationships)
+    if (records.length > 0) {
+      try {
+        for (const record of records) {
+          // Delete artifact node and all its relationships in Neo4j
+          await this.graphService.deleteArtifact(record.externalId);
+        }
+      } catch (error) {
+        // Log but don't fail the deletion if Neo4j cleanup fails
+        console.error('Neo4j cleanup failed:', error);
+      }
+    }
+
+    // Step 4: Delete the DataSource
     return this.prisma.dataSource.delete({
       where: { id },
     });
