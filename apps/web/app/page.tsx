@@ -147,34 +147,61 @@ export default function AmbientFeed() {
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sansSelection">
       {/* Navigation Rail */}
-      <aside className="w-20 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-8 space-y-8 z-20">
+      <aside id="navigation" className="w-20 bg-slate-900 border-r border-slate-800 flex flex-col items-center py-8 space-y-8 z-20" role="navigation" aria-label="Main navigation">
         <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <span className="text-white font-black text-xl">K</span>
+          <span className="text-white font-black text-xl" aria-label="Kushim">K</span>
         </div>
         
         <nav className="flex-1 flex flex-col space-y-4">
-          <button className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl transition-all" title="Ambient Feed">
-            <LayoutDashboard className="w-6 h-6" />
+          <button 
+            className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl transition-all" 
+            title="Ambient Feed"
+            aria-label="Ambient Feed"
+            aria-current="page"
+          >
+            <LayoutDashboard className="w-6 h-6" aria-hidden="true" />
           </button>
-          <a href="/sources" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Data Sources">
-            <Database className="w-6 h-6" />
+          <a 
+            href="/sources" 
+            className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" 
+            title="Data Sources"
+            aria-label="Data Sources"
+          >
+            <Database className="w-6 h-6" aria-hidden="true" />
           </a>
-          <a href="/context" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Context Graph">
-            <Network className="w-6 h-6" />
+          <a 
+            href="/context" 
+            className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" 
+            title="Context Graph"
+            aria-label="Context Graph"
+          >
+            <Network className="w-6 h-6" aria-hidden="true" />
           </a>
-          <a href="/activity" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Audit Logs">
-            <Activity className="w-6 h-6" />
+          <a 
+            href="/activity" 
+            className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" 
+            title="Audit Logs"
+            aria-label="Audit Logs"
+          >
+            <Activity className="w-6 h-6" aria-hidden="true" />
           </a>
-          <a href="/mfa/setup" className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" title="Security">
-            <Shield className="w-6 h-6" />
+          <a 
+            href="/mfa/setup" 
+            className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" 
+            title="Security"
+            aria-label="Security"
+          >
+            <Shield className="w-6 h-6" aria-hidden="true" />
           </a>
         </nav>
 
         <button 
           onClick={() => { localStorage.removeItem('token'); router.push('/login'); }}
           className="p-3 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+          aria-label="Log out"
+          title="Log out"
         >
-          <LogOut className="w-6 h-6" />
+          <LogOut className="w-6 h-6" aria-hidden="true" />
         </button>
       </aside>
 
@@ -187,27 +214,37 @@ export default function AmbientFeed() {
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 cursor-pointer hover:border-slate-700 transition group" onClick={() => setCommandBarOpen(true)}>
-              <Search className="w-4 h-4 text-slate-500 group-hover:text-slate-300 mr-2" />
+            <div 
+              id="search"
+              className="flex items-center bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 cursor-pointer hover:border-slate-700 transition group" 
+              onClick={() => setCommandBarOpen(true)}
+              role="button"
+              tabIndex={0}
+              aria-label="Open command bar - Press Command K"
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCommandBarOpen(true); }}
+            >
+              <Search className="w-4 h-4 text-slate-500 group-hover:text-slate-300 mr-2" aria-hidden="true" />
               <span className="text-sm text-slate-500 group-hover:text-slate-400 pr-8">Search or command...</span>
-              <kbd className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700">⌘K</kbd>
+              <kbd className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700" aria-label="Keyboard shortcut: Command K">⌘K</kbd>
             </div>
 
             <button 
               onClick={handleSync}
               disabled={syncing}
+              aria-label={syncing ? "Syncing data from all sources" : "Sync data from all sources"}
+              aria-busy={syncing}
               className={cn(
                 "flex items-center px-4 py-2 rounded-lg font-semibold text-sm transition-all",
                 syncing ? "bg-slate-800 text-slate-500 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
               )}
             >
-              <RefreshCw className={cn("w-4 h-4 mr-2", syncing && "animate-spin")} />
+              <RefreshCw className={cn("w-4 h-4 mr-2", syncing && "animate-spin")} aria-hidden="true" />
               {syncing ? "Syncing..." : "Sync"}
             </button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-10 space-y-10 scrollbar-hide">
+        <main id="main-content" className="flex-1 overflow-y-auto p-10 space-y-10 scrollbar-hide" role="main" aria-label="Ambient feed content">
           {contextGroups.length > 0 ? (
             <div className="max-w-4xl mx-auto space-y-12">
               {contextGroups.map((group) => (

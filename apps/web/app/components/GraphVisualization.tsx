@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Info, X, ExternalLink } from 'lucide-react';
 import LinkExplanationPanel from '../../components/LinkExplanationPanel';
+import { useA11yAnnounce } from '@/hooks/useA11y';
 
 interface GraphNode {
   id: string;
@@ -38,6 +39,7 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [selectedLink, setSelectedLink] = useState<{ sourceId: string; targetId: string } | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const announce = useA11yAnnounce();
 
   useEffect(() => {
     const updateDimensions = () => {
@@ -54,15 +56,22 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
 
   const handleNodeClick = useCallback((node: GraphNode) => {
     setSelectedNode(node);
-  }, []);
+    const connectionCount = data.links.filter(
+      (link) =>
+        (typeof link.source === 'string' ? link.source : link.source.id) === node.id ||
+        (typeof link.target === 'string' ? link.target : link.target.id) === node.id
+    ).length;
+    announce(`Selected ${node.label}, ${connectionCount} connections`, 'polite');
+  }, [data.links, announce]);
 
   const handleNodeRightClick = useCallback((node: GraphNode) => {
     // Center on node
     if (graphRef.current) {
       graphRef.current.centerAt(node.x, node.y, 1000);
       graphRef.current.zoom(3, 1000);
+      announce(`Focused on ${node.label}`, 'polite');
     }
-  }, []);
+  }, [announce]);
 
   const handleLinkClick = useCallback((link: GraphLink) => {
     const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
@@ -112,71 +121,83 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
 
   return (
     <div className="relative w-full h-full">
-      <ForceGraph2D
-        ref={graphRef}
-        graphData={data}
-        width={dimensions.width}
-        height={dimensions.height}
-        nodeLabel={(node) => (node as GraphNode).label}
-        nodeColor={(node) => getNodeColor(node as GraphNode)}
-        nodeVal={(node) => getNodeSize(node as GraphNode)}
-        nodeCanvasObject={(node, ctx, globalScale) => {
-          const typedNode = node as GraphNode;
-          const label = typedNode.label;
-          const fontSize = 12 / globalScale;
-          const nodeSize = getNodeSize(typedNode);
+      <div 
+        role="img" 
+        aria-label={`Graph visualization showing ${data.nodes.length} artifacts and ${data.links.length} connections. Use mouse to explore or view the legend for details.`}
+        aria-describedby="graph-legend"
+      >
+        <ForceGraph2D
+          ref={graphRef}
+          graphData={data}
+          width={dimensions.width}
+          height={dimensions.height}
+          nodeLabel={(node) => (node as GraphNode).label}
+          nodeColor={(node) => getNodeColor(node as GraphNode)}
+          nodeVal={(node) => getNodeSize(node as GraphNode)}
+          nodeCanvasObject={(node, ctx, globalScale) => {
+            const typedNode = node as GraphNode;
+            const label = typedNode.label;
+            const fontSize = 12 / globalScale;
+            const nodeSize = getNodeSize(typedNode);
 
-          // Draw node circle
-          ctx.beginPath();
-          ctx.arc(node.x!, node.y!, nodeSize, 0, 2 * Math.PI, false);
-          ctx.fillStyle = getNodeColor(typedNode);
-          ctx.fill();
+            // Draw node circle
+            ctx.beginPath();
+            ctx.arc(node.x!, node.y!, nodeSize, 0, 2 * Math.PI, false);
+            ctx.fillStyle = getNodeColor(typedNode);
+            ctx.fill();
 
-          // Draw border for selected node
-          if (selectedNode?.id === typedNode.id) {
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2 / globalScale;
-            ctx.stroke();
-          }
+            // Draw border for selected node
+            if (selectedNode?.id === typedNode.id) {
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = 2 / globalScale;
+              ctx.stroke();
+            }
 
-          // Draw label
-          if (globalScale > 1.5) {
-            ctx.font = `${fontSize}px Sans-Serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#e2e8f0';
-            ctx.fillText(label, node.x!, node.y! + nodeSize + fontSize);
-          }
-        }}
-        linkColor={(link) => getLinkColor(link as GraphLink)}
-        linkWidth={(link) => getLinkWidth(link as GraphLink)}
-        linkDirectionalParticles={2}
-        linkDirectionalParticleWidth={(link) => getLinkWidth(link as GraphLink)}
-        linkDirectionalParticleSpeed={0.005}
-        onNodeClick={handleNodeClick}
-        onNodeRightClick={handleNodeRightClick}
-        onLinkClick={handleLinkClick}
-        onBackgroundClick={() => {
-          setSelectedNode(null);
-          setSelectedLink(null);
-        }}
-        cooldownTicks={100}
-        backgroundColor="#020617"
-        enableNodeDrag={true}
-        enableZoomInteraction={true}
-        enablePanInteraction={true}
-      />
+            // Draw label
+            if (globalScale > 1.5) {
+              ctx.font = `${fontSize}px Sans-Serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillStyle = '#e2e8f0';
+              ctx.fillText(label, node.x!, node.y! + nodeSize + fontSize);
+            }
+          }}
+          linkColor={(link) => getLinkColor(link as GraphLink)}
+          linkWidth={(link) => getLinkWidth(link as GraphLink)}
+          linkDirectionalParticles={2}
+          linkDirectionalParticleWidth={(link) => getLinkWidth(link as GraphLink)}
+          linkDirectionalParticleSpeed={0.005}
+          onNodeClick={handleNodeClick}
+          onNodeRightClick={handleNodeRightClick}
+          onLinkClick={handleLinkClick}
+          onBackgroundClick={() => {
+            setSelectedNode(null);
+            setSelectedLink(null);
+          }}
+          cooldownTicks={100}
+          backgroundColor="#020617"
+          enableNodeDrag={true}
+          enableZoomInteraction={true}
+          enablePanInteraction={true}
+        />
+      </div>
 
       {/* Node Details Panel */}
       {selectedNode && (
-        <div className="absolute top-4 right-4 w-80 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+        <div 
+          className="absolute top-4 right-4 w-80 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="node-details-title"
+        >
           <div className="bg-slate-950/50 p-4 border-b border-slate-800 flex items-center justify-between">
-            <h3 className="font-bold text-white">Node Details</h3>
+            <h3 id="node-details-title" className="font-bold text-white">Node Details</h3>
             <button
               onClick={() => setSelectedNode(null)}
               className="p-1 hover:bg-slate-800 rounded transition"
+              aria-label="Close node details"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 
@@ -219,9 +240,10 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center text-indigo-400 hover:text-indigo-300 text-xs transition"
+                  aria-label={`View ${selectedNode.label} in ${selectedNode.metadata.platform}`}
                 >
                   View in platform
-                  <ExternalLink className="w-3 h-3 ml-1" />
+                  <ExternalLink className="w-3 h-3 ml-1" aria-hidden="true" />
                 </a>
               </div>
             )}
@@ -250,31 +272,36 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
       )}
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-slate-900/90 border border-slate-800 rounded-xl p-4 backdrop-blur-sm">
+      <div 
+        id="graph-legend"
+        className="absolute bottom-4 left-4 bg-slate-900/90 border border-slate-800 rounded-xl p-4 backdrop-blur-sm"
+        role="region"
+        aria-label="Graph legend"
+      >
         <div className="flex items-center text-xs text-slate-500 mb-3">
-          <Info className="w-3 h-3 mr-1" />
+          <Info className="w-3 h-3 mr-1" aria-hidden="true" />
           Node Colors
         </div>
         <div className="space-y-2">
           <div className="flex items-center text-xs">
-            <div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
-            <span className="text-slate-300">GitHub</span>
+            <div className="w-3 h-3 rounded-full bg-orange-500 mr-2" aria-hidden="true"></div>
+            <span className="text-slate-300">GitHub <span className="sr-only">(Orange)</span></span>
           </div>
           <div className="flex items-center text-xs">
-            <div className="w-3 h-3 rounded-full bg-sky-500 mr-2"></div>
-            <span className="text-slate-300">Jira</span>
+            <div className="w-3 h-3 rounded-full bg-sky-500 mr-2" aria-hidden="true"></div>
+            <span className="text-slate-300">Jira <span className="sr-only">(Blue)</span></span>
           </div>
           <div className="flex items-center text-xs">
-            <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
-            <span className="text-slate-300">Slack</span>
+            <div className="w-3 h-3 rounded-full bg-purple-500 mr-2" aria-hidden="true"></div>
+            <span className="text-slate-300">Slack <span className="sr-only">(Purple)</span></span>
           </div>
           <div className="flex items-center text-xs">
-            <div className="w-3 h-3 rounded-full bg-emerald-500 mr-2"></div>
-            <span className="text-slate-300">Google</span>
+            <div className="w-3 h-3 rounded-full bg-emerald-500 mr-2" aria-hidden="true"></div>
+            <span className="text-slate-300">Google <span className="sr-only">(Green)</span></span>
           </div>
           <div className="flex items-center text-xs">
-            <div className="w-3 h-3 rounded-full bg-indigo-500 mr-2"></div>
-            <span className="text-slate-300">Context Group</span>
+            <div className="w-3 h-3 rounded-full bg-indigo-500 mr-2" aria-hidden="true"></div>
+            <span className="text-slate-300">Context Group <span className="sr-only">(Indigo)</span></span>
           </div>
         </div>
 
@@ -284,21 +311,21 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
           </div>
           <div className="space-y-1">
             <div className="flex items-center text-xs">
-              <div className="w-4 h-0.5 bg-green-500 mr-2"></div>
-              <span className="text-slate-300">High (&gt;70%)</span>
+              <div className="w-4 h-0.5 bg-green-500 mr-2" aria-hidden="true"></div>
+              <span className="text-slate-300">High (&gt;70%) ✓</span>
             </div>
             <div className="flex items-center text-xs">
-              <div className="w-4 h-0.5 bg-yellow-500 mr-2"></div>
-              <span className="text-slate-300">Medium (40-70%)</span>
+              <div className="w-4 h-0.5 bg-yellow-500 mr-2" aria-hidden="true"></div>
+              <span className="text-slate-300">Medium (40-70%) ~</span>
             </div>
             <div className="flex items-center text-xs">
-              <div className="w-4 h-0.5 bg-slate-500 mr-2"></div>
-              <span className="text-slate-300">Low (&lt;40%)</span>
+              <div className="w-4 h-0.5 bg-slate-500 mr-2" aria-hidden="true"></div>
+              <span className="text-slate-300">Low (&lt;40%) ·</span>
             </div>
           </div>
         </div>
 
-        <div className="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-500">
+        <div className="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-500" role="note">
           <div>Click: Select node</div>
           <div>Click link: View explanation</div>
           <div>Right-click: Focus node</div>

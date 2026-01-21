@@ -110,14 +110,22 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
   const scorePercent = Math.round(explanation.confidenceScore * 100);
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-2xl overflow-y-auto">
+    <div 
+      className="fixed right-0 top-0 h-full w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-2xl overflow-y-auto"
+      role="complementary"
+      aria-label="Link explanation panel"
+    >
       <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between z-10">
         <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Link2 className="w-5 h-5" />
+          <Link2 className="w-5 h-5" aria-hidden="true" />
           Link Explanation
         </h2>
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition">
-          <X className="w-5 h-5" />
+        <button 
+          onClick={onClose} 
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+          aria-label="Close link explanation panel"
+        >
+          <X className="w-5 h-5" aria-hidden="true" />
         </button>
       </div>
 
@@ -125,24 +133,24 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
         {/* Method Badge */}
         <div className="flex items-center gap-2">
           {isMLAssisted ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
-              <Brain className="w-4 h-4" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium" role="status">
+              <Brain className="w-4 h-4" aria-hidden="true" />
               ML-Assisted
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm font-medium">
-              <Check className="w-4 h-4" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full text-sm font-medium" role="status">
+              <Check className="w-4 h-4" aria-hidden="true" />
               Deterministic
             </span>
           )}
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-gray-500" aria-label={`Confidence: ${scorePercent} percent`}>
             {scorePercent}% confidence
           </span>
         </div>
 
         {/* Artifacts */}
         <div className="space-y-3">
-          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" role="region" aria-label="Source artifact">
             <div className="text-xs text-gray-500 mb-1">Source</div>
             <div className="font-medium text-sm">{explanation.source.title}</div>
             <div className="text-xs text-gray-500 mt-1">
@@ -183,12 +191,13 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-600 dark:text-gray-400">Deterministic Signals</span>
-                <span className="font-medium">{Math.round(explanation.explanation.deterministicScore * 100)}%</span>
+                <span className="font-medium" aria-label={`${Math.round(explanation.explanation.deterministicScore * 100)} percent`}>{Math.round(explanation.explanation.deterministicScore * 100)}%</span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2" role="meter" aria-valuenow={Math.round(explanation.explanation.deterministicScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Deterministic signals score">
                 <div
                   className="bg-green-500 h-2 rounded-full transition-all"
                   style={{ width: `${explanation.explanation.deterministicScore * 100}%` }}
+                  aria-hidden="true"
                 />
               </div>
             </div>
@@ -198,15 +207,16 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
                   Semantic Similarity
                 </span>
-                <span className="font-medium">{Math.round(explanation.explanation.semanticScore * 100)}%</span>
+                <span className="font-medium" aria-label={`${Math.round(explanation.explanation.semanticScore * 100)} percent`}>{Math.round(explanation.explanation.semanticScore * 100)}%</span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2" role="meter" aria-valuenow={Math.round(explanation.explanation.semanticScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Semantic similarity score">
                 <div
                   className="bg-blue-500 h-2 rounded-full transition-all"
                   style={{ width: `${explanation.explanation.semanticScore * 100}%` }}
+                  aria-hidden="true"
                 />
               </div>
             </div>
@@ -216,15 +226,16 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                  <TrendingUp className="w-3.5 h-3.5" />
+                  <TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />
                   Structural Features
                 </span>
-                <span className="font-medium">{Math.round(explanation.explanation.structuralScore * 100)}%</span>
+                <span className="font-medium" aria-label={`${Math.round(explanation.explanation.structuralScore * 100)} percent`}>{Math.round(explanation.explanation.structuralScore * 100)}%</span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2" role="meter" aria-valuenow={Math.round(explanation.explanation.structuralScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Structural features score">
                 <div
                   className="bg-purple-500 h-2 rounded-full transition-all"
                   style={{ width: `${explanation.explanation.structuralScore * 100}%` }}
+                  aria-hidden="true"
                 />
               </div>
             </div>
@@ -234,12 +245,13 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
             <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
               <div className="flex justify-between text-sm mb-1">
                 <span className="font-semibold text-gray-700 dark:text-gray-300">Combined ML Score</span>
-                <span className="font-semibold">{Math.round(explanation.explanation.mlScore * 100)}%</span>
+                <span className="font-semibold" aria-label={`${Math.round(explanation.explanation.mlScore * 100)} percent`}>{Math.round(explanation.explanation.mlScore * 100)}%</span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5" role="meter" aria-valuenow={Math.round(explanation.explanation.mlScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Combined ML score">
                 <div
                   className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2.5 rounded-full transition-all"
                   style={{ width: `${explanation.explanation.mlScore * 100}%` }}
+                  aria-hidden="true"
                 />
               </div>
             </div>

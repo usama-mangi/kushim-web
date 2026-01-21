@@ -9,6 +9,24 @@
   --foreground: #f8fafc; /* slate-50 */
 }
 
+/* High Contrast Mode */
+[data-theme="high-contrast"] {
+  --background: #000000;
+  --foreground: #ffffff;
+  --border-color: #ffffff;
+  --focus-ring: #00ffff;
+}
+
+[data-theme="high-contrast"] * {
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="high-contrast"] button,
+[data-theme="high-contrast"] a {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
@@ -42,6 +60,54 @@ body {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Screen Reader Only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Skip Links */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  z-index: 100;
+  padding: 8px 16px;
+  background: #3b82f6;
+  color: white;
+  text-decoration: none;
+  border-radius: 0 0 4px 0;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Enhanced Focus Indicators (WCAG 2.4.7) */
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer utilities {

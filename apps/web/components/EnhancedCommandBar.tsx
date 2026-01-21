@@ -9,6 +9,7 @@ import {
 import Fuse from 'fuse.js';
 import { toast } from 'sonner';
 import { Artifact } from '@/store/useStore';
+import { useA11yAnnounce } from '@/hooks/useA11y';
 
 interface EnhancedCommandBarProps {
   isOpen: boolean;
@@ -47,6 +48,12 @@ export default function EnhancedCommandBar({
   const [pendingCommand, setPendingCommand] = useState('');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const announce = useA11yAnnounce();
+  
+  // Generate unique IDs for ARIA
+  const comboboxId = 'command-bar-combobox';
+  const listboxId = 'command-bar-listbox';
+  const statusId = 'command-bar-status';
 
   // Load command history from localStorage
   useEffect(() => {
@@ -85,12 +92,20 @@ export default function EnhancedCommandBar({
   // Determine mode based on input
   useEffect(() => {
     const firstWord = input.trim().split(/\s+/)[0]?.toLowerCase();
+    const previousMode = mode;
+    
     if (ACTION_VERBS.includes(firstWord)) {
       setMode('command');
+      if (previousMode !== 'command') {
+        announce('Switched to command mode', 'polite');
+      }
     } else {
       setMode('search');
+      if (previousMode !== 'search') {
+        announce('Switched to search mode', 'polite');
+      }
     }
-  }, [input]);
+  }, [input, announce]);
 
   // Validate command syntax in real-time
   const validation = useMemo((): ValidationResult => {
@@ -201,11 +216,32 @@ export default function EnhancedCommandBar({
     if (mode === 'command' || !input.trim()) return [];
     
     const results = fuse.search(input);
-    return results.slice(0, 10).map(r => r.item);
-  }, [input, mode, fuse]);
+    const items = results.slice(0, 10).map(r => r.item);
+    
+    // Announce result count
+    if (items.length > 0) {
+      announce(`${items.length} results found`, 'polite');
+    } else {
+      announce('No results found', 'polite');
+    }
+    
+    return items;
+  }, [input, mode, fuse, announce]);
 
   // Combined results for keyboard navigation
   const displayItems = mode === 'search' ? searchResults : suggestions;
+  
+  // Announce selection changes
+  useEffect(() => {
+    if (displayItems.length > 0 && selectedIndex >= 0 && selectedIndex < displayItems.length) {
+      const item = displayItems[selectedIndex];
+      if (mode === 'search') {
+        announce(`Selected: ${(item as Artifact).title}`, 'polite');
+      } else {
+        announce(`Selected: ${item.text}`, 'polite');
+      }
+    }
+  }, [selectedIndex, displayItems, mode, announce]);
 
   // Reset state when closing
   useEffect(() => {
@@ -324,17 +360,35 @@ export default function EnhancedCommandBar({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4">
-      <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={onClose} />
+    <div 
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="command-bar-title"
+    >
+      <div 
+        className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" 
+        onClick={onClose}
+        aria-hidden="true"
+      />
       
       <div className="bg-slate-900 w-full max-w-2xl rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden relative z-10 border border-slate-800 transform animate-in fade-in zoom-in duration-200">
         {/* Header */}
         <div className="flex items-center px-6 py-4 border-b border-slate-800 bg-slate-900">
           <div className="flex items-center space-x-3 flex-1">
-            <Command className="w-5 h-5 text-indigo-500" />
+            <Command className="w-5 h-5 text-indigo-500" aria-hidden="true" />
+            <span id="command-bar-title" className="sr-only">Command bar - Search artifacts or execute commands</span>
             
             <input 
               ref={inputRef}
+              id={comboboxId}
+              role="combobox"
+              aria-expanded={displayItems.length > 0}
+              aria-controls={listboxId}
+              aria-activedescendant={displayItems.length > 0 ? `${listboxId}-item-${selectedIndex}` : undefined}
+              aria-autocomplete="list"
+              aria-label="Search artifacts or execute commands"
+              aria-describedby={statusId}
               autoFocus
               placeholder="Type a command or search..."
               className="flex-1 bg-transparent border-none outline-none text-lg text-white placeholder-slate-600 font-medium"
@@ -342,23 +396,33 @@ export default function EnhancedCommandBar({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isExecuting}
+              aria-busy={isExecuting}
             />
 
-            {isExecuting && <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />}
+            {isExecuting && <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" aria-label="Executing command" />}
           </div>
 
           <div className="flex items-center space-x-2">
             {/* Mode indicator */}
-            <div className={`text-[10px] font-bold px-2 py-1 rounded ${mode === 'command' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'}`}>
+            <div 
+              className={`text-[10px] font-bold px-2 py-1 rounded ${mode === 'command' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'}`}
+              role="status"
+              aria-label={`Current mode: ${mode === 'command' ? 'Command mode' : 'Search mode'}`}
+            >
               {mode === 'command' ? '⚡ COMMAND' : '🔍 SEARCH'}
             </div>
-            <kbd className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded border border-slate-700 uppercase">Esc</kbd>
+            <kbd className="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded border border-slate-700 uppercase" aria-label="Press Escape to close">Esc</kbd>
           </div>
         </div>
 
         {/* Validation feedback */}
         {mode === 'command' && input && (
-          <div className={`px-6 py-2 text-sm border-b ${validation.isValid ? validation.warning ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400' : 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+          <div 
+            id={statusId}
+            role="alert"
+            aria-live="polite"
+            className={`px-6 py-2 text-sm border-b ${validation.isValid ? validation.warning ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400' : 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}
+          >
             {validation.error && `❌ ${validation.error}`}
             {validation.warning && `⚠️ ${validation.warning}`}
             {validation.preview && !validation.error && !validation.warning && `${validation.preview}`}
@@ -379,9 +443,9 @@ export default function EnhancedCommandBar({
 
         {/* Confirmation dialog */}
         {showConfirm && (
-          <div className="px-6 py-4 bg-orange-500/10 border-b border-orange-500/20">
+          <div className="px-6 py-4 bg-orange-500/10 border-b border-orange-500/20" role="alert" aria-live="assertive">
             <div className="flex items-center space-x-3">
-              <AlertCircle className="w-5 h-5 text-orange-400" />
+              <AlertCircle className="w-5 h-5 text-orange-400" aria-hidden="true" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-orange-200">Confirm Destructive Action</p>
                 <p className="text-xs text-orange-300/70 mt-1">{validation.preview}</p>
@@ -390,12 +454,14 @@ export default function EnhancedCommandBar({
                 <button 
                   onClick={() => executeCommand(pendingCommand)}
                   className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-sm font-medium"
+                  aria-label="Confirm destructive action"
                 >
                   Confirm
                 </button>
                 <button 
                   onClick={() => setShowConfirm(false)}
                   className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm font-medium"
+                  aria-label="Cancel destructive action"
                 >
                   Cancel
                 </button>
@@ -407,50 +473,65 @@ export default function EnhancedCommandBar({
         {/* Results */}
         <div className="max-h-[50vh] overflow-y-auto scrollbar-hide py-2">
           {mode === 'search' && searchResults.length > 0 ? (
-            <div className="px-2">
+            <div 
+              className="px-2"
+              role="listbox"
+              id={listboxId}
+              aria-label="Search results"
+            >
               {searchResults.map((record, idx) => (
                 <div 
                   key={record.id}
+                  id={`${listboxId}-item-${idx}`}
+                  role="option"
+                  aria-selected={idx === selectedIndex}
                   onClick={() => { onSelectArtifact(record); onClose(); }}
                   className={`p-3 hover:bg-slate-800 rounded-xl cursor-pointer transition group flex items-center space-x-4 mx-2 ${idx === selectedIndex ? 'bg-slate-800' : ''}`}
+                  aria-label={`${record.title}, Platform: ${record.sourcePlatform}, Author: ${record.author}`}
                 >
-                  <div className={`p-2 rounded-lg bg-slate-950 border border-slate-800 transition ${idx === selectedIndex ? 'text-indigo-400 border-indigo-500/30' : 'text-slate-500'}`}>
+                  <div className={`p-2 rounded-lg bg-slate-950 border border-slate-800 transition ${idx === selectedIndex ? 'text-indigo-400 border-indigo-500/30' : 'text-slate-500'}`} aria-hidden="true">
                     {getPlatformIcon(record.sourcePlatform)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-200 group-hover:text-white transition truncate">{record.title}</p>
                     <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">{record.sourcePlatform} • {record.author}</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-700 group-hover:text-slate-400 transition" />
+                  <ChevronRight className="w-4 h-4 text-slate-700 group-hover:text-slate-400 transition" aria-hidden="true" />
                 </div>
               ))}
             </div>
           ) : mode === 'command' && suggestions.length > 0 ? (
             <div className="px-2">
-              <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-2 px-4">Suggestions (Tab to autocomplete)</p>
-              {suggestions.map((suggestion, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setInput(suggestion.text)}
-                  className={`p-3 hover:bg-slate-800 rounded-xl cursor-pointer transition group flex items-center space-x-4 mx-2 ${idx === selectedIndex ? 'bg-slate-800' : ''}`}
-                >
-                  <div className={`p-2 rounded-lg bg-slate-950 border border-slate-800 transition ${idx === selectedIndex ? 'text-indigo-400 border-indigo-500/30' : 'text-slate-500'}`}>
-                    {getPlatformIcon(suggestion.platform)}
+              <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-2 px-4" id={`${listboxId}-label`}>Suggestions (Tab to autocomplete)</p>
+              <div role="listbox" id={listboxId} aria-labelledby={`${listboxId}-label`}>
+                {suggestions.map((suggestion, idx) => (
+                  <div
+                    key={idx}
+                    id={`${listboxId}-item-${idx}`}
+                    role="option"
+                    aria-selected={idx === selectedIndex}
+                    onClick={() => setInput(suggestion.text)}
+                    className={`p-3 hover:bg-slate-800 rounded-xl cursor-pointer transition group flex items-center space-x-4 mx-2 ${idx === selectedIndex ? 'bg-slate-800' : ''}`}
+                    aria-label={`${suggestion.text} - ${suggestion.label}`}
+                  >
+                    <div className={`p-2 rounded-lg bg-slate-950 border border-slate-800 transition ${idx === selectedIndex ? 'text-indigo-400 border-indigo-500/30' : 'text-slate-500'}`} aria-hidden="true">
+                      {getPlatformIcon(suggestion.platform)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-mono text-indigo-300">{suggestion.text}</p>
+                      <p className="text-xs text-slate-500 truncate">{suggestion.label}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-mono text-indigo-300">{suggestion.text}</p>
-                    <p className="text-xs text-slate-500 truncate">{suggestion.label}</p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           ) : input && searchResults.length === 0 && mode === 'search' ? (
-            <div className="py-12 text-center">
-              <AlertCircle className="w-8 h-8 text-slate-800 mx-auto mb-3" />
+            <div className="py-12 text-center" role="status" aria-live="polite">
+              <AlertCircle className="w-8 h-8 text-slate-800 mx-auto mb-3" aria-hidden="true" />
               <p className="text-slate-500 text-sm">No artifacts matching "{input}"</p>
             </div>
           ) : (
-            <div className="p-6 space-y-4 text-xs">
+            <div className="p-6 space-y-4 text-xs" role="region" aria-label="Command examples">
               <div className="grid grid-cols-2 gap-2">
                 <div className="p-2 bg-slate-950/50 border border-slate-800 rounded-lg">
                   <p className="text-slate-400 font-mono">comment GH-13 LGTM!</p>
@@ -470,17 +551,18 @@ export default function EnhancedCommandBar({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex justify-between items-center text-[10px]">
+        <div className="px-6 py-3 bg-slate-950 border-t border-slate-800 flex justify-between items-center text-[10px]" role="region" aria-label="Keyboard shortcuts">
           <div className="flex items-center space-x-4 text-slate-600 uppercase tracking-widest font-bold">
-            <span className="flex items-center"><kbd className="bg-slate-900 px-1.5 py-0.5 rounded mr-1.5 border border-slate-800">↑↓</kbd> Navigate</span>
-            <span className="flex items-center"><kbd className="bg-slate-900 px-1.5 py-0.5 rounded mr-1.5 border border-slate-800">Tab</kbd> Autocomplete</span>
-            <span className="flex items-center"><kbd className="bg-slate-900 px-1.5 py-0.5 rounded mr-1.5 border border-slate-800">↵</kbd> {mode === 'command' ? 'Execute' : 'Select'}</span>
+            <span className="flex items-center"><kbd className="bg-slate-900 px-1.5 py-0.5 rounded mr-1.5 border border-slate-800" aria-label="Arrow keys">↑↓</kbd> Navigate</span>
+            <span className="flex items-center"><kbd className="bg-slate-900 px-1.5 py-0.5 rounded mr-1.5 border border-slate-800" aria-label="Tab key">Tab</kbd> Autocomplete</span>
+            <span className="flex items-center"><kbd className="bg-slate-900 px-1.5 py-0.5 rounded mr-1.5 border border-slate-800" aria-label="Enter key">↵</kbd> {mode === 'command' ? 'Execute' : 'Select'}</span>
           </div>
           <button 
             onClick={() => toast.info('Command syntax help', { description: 'Use format: verb TARGET payload. Examples: comment GH-13 message, assign PROJ-123 @user' })}
             className="flex items-center text-indigo-500 hover:text-indigo-400"
+            aria-label="Show command syntax help"
           >
-            <HelpCircle className="w-3 h-3 mr-1" />
+            <HelpCircle className="w-3 h-3 mr-1" aria-hidden="true" />
             Help
           </button>
         </div>

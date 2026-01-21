@@ -16,6 +16,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased font-sans">
+        {/* Skip Links for Accessibility */}
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+        <a href="#navigation" className="skip-link">
+          Skip to navigation
+        </a>
+        <a href="#search" className="skip-link">
+          Skip to search
+        </a>
+        
         <Providers>{children}</Providers>
         <Toaster position="top-right" richColors />
       </body>

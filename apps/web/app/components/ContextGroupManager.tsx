@@ -133,7 +133,7 @@ export default function ContextGroupManager({
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" role="group" aria-label={`Actions for ${group.name}`}>
       {isEditing ? (
         <div className="flex items-center gap-2 flex-1">
           <input
@@ -142,6 +142,8 @@ export default function ContextGroupManager({
             onChange={(e) => setNewName(e.target.value)}
             className="flex-1 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-sm text-white"
             autoFocus
+            aria-label="New group name"
+            aria-invalid={!newName.trim()}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleRename();
               if (e.key === 'Escape') {
@@ -153,18 +155,21 @@ export default function ContextGroupManager({
           <button
             onClick={handleRename}
             disabled={loading}
+            aria-label="Save new name"
+            aria-busy={loading}
             className="p-1.5 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded transition-colors"
           >
-            <Check className="w-3.5 h-3.5" />
+            <Check className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
           <button
             onClick={() => {
               setIsEditing(false);
               setNewName(group.name);
             }}
+            aria-label="Cancel rename"
             className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded transition-colors"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </div>
       ) : (
@@ -173,24 +178,27 @@ export default function ContextGroupManager({
             onClick={() => setShowArtifactManager(true)}
             className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-300 rounded transition-colors"
             title="Manage artifacts"
+            aria-label={`Manage artifacts in ${group.name}`}
           >
-            <Users className="w-3.5 h-3.5" />
+            <Users className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
 
           <button
             onClick={() => setIsEditing(true)}
             className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-300 rounded transition-colors"
             title="Rename group"
+            aria-label={`Rename ${group.name}`}
           >
-            <Pencil className="w-3.5 h-3.5" />
+            <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
           
           <button
             onClick={() => setShowMergeModal(true)}
             className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-300 rounded transition-colors"
             title="Merge with another group"
+            aria-label={`Merge ${group.name} with another group`}
           >
-            <GitMerge className="w-3.5 h-3.5" />
+            <GitMerge className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
           
           <button
@@ -198,31 +206,33 @@ export default function ContextGroupManager({
             disabled={loading || !!(group.coherenceScore && group.coherenceScore >= 0.4)}
             className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-300 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title={group.coherenceScore && group.coherenceScore >= 0.4 ? "Group coherence is good" : "Split group"}
+            aria-label={group.coherenceScore && group.coherenceScore >= 0.4 ? `Split ${group.name} (disabled: coherence is good)` : `Split ${group.name}`}
           >
-            <Split className="w-3.5 h-3.5" />
+            <Split className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
           
           <button
             onClick={() => setShowDeleteConfirm(true)}
             className="p-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors"
             title="Delete group"
+            aria-label={`Delete ${group.name}`}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </>
       )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold text-white mb-2">Delete Context Group?</h3>
+            <h3 id="delete-dialog-title" className="text-lg font-bold text-white mb-2">Delete Context Group?</h3>
             <p className="text-sm text-slate-400 mb-4">
               This will remove the group &quot;{group.name}&quot; but artifacts will remain in the graph.
             </p>
             {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 mt-0.5" />
+              <div role="alert" className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 mt-0.5" aria-hidden="true" />
                 <p className="text-sm text-red-400">{error}</p>
               </div>
             )}
@@ -230,6 +240,7 @@ export default function ContextGroupManager({
               <button
                 onClick={handleDelete}
                 disabled={loading}
+                aria-busy={loading}
                 className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50"
               >
                 {loading ? 'Deleting...' : 'Delete'}
