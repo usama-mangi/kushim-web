@@ -66,7 +66,7 @@ export class SlackAdapter extends BaseAdapter {
     }
 
     const payload: Omit<KushimStandardRecord, 'checksum' | 'id'> = {
-      externalId: id,
+      externalId: `SLACK-${id}`,
       sourcePlatform: 'slack',
       artifactType: ArtifactType.MESSAGE,
       title: title || 'Untitled Message',

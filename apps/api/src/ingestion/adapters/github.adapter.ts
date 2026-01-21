@@ -32,7 +32,7 @@ export class GithubAdapter extends BaseAdapter {
 
   normalize(rawRecord: any): KushimStandardRecord {
     const payload: Omit<KushimStandardRecord, 'checksum' | 'id'> = {
-      externalId: String(rawRecord.id),
+      externalId: `GH-${rawRecord.number}`,
       sourcePlatform: 'github',
       artifactType: rawRecord.pull_request
         ? ArtifactType.PULL_REQUEST

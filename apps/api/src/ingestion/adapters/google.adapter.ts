@@ -103,7 +103,7 @@ export class GoogleAdapter extends BaseAdapter {
 
   private normalizeDrive(file: any): Omit<KushimStandardRecord, 'checksum' | 'id'> {
     return {
-      externalId: file.id,
+      externalId: `GDOC-${file.id}`,
       sourcePlatform: 'google',
       artifactType: ArtifactType.DOCUMENT,
       title: file.name,
@@ -126,7 +126,7 @@ export class GoogleAdapter extends BaseAdapter {
     const date = headers.find((h: any) => h.name === 'Date')?.value;
 
     return {
-        externalId: msg.id,
+        externalId: `EMAIL-${msg.id}`,
         sourcePlatform: 'google',
         artifactType: ArtifactType.EMAIL,
         title: subject,
