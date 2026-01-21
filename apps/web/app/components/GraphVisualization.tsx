@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Info, X, ExternalLink } from 'lucide-react';
+import LinkExplanationPanel from '../../components/LinkExplanationPanel';
 
 interface GraphNode {
   id: string;
@@ -35,6 +36,7 @@ interface GraphVisualizationProps {
 export default function GraphVisualization({ data }: GraphVisualizationProps) {
   const graphRef = useRef<any>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [selectedLink, setSelectedLink] = useState<{ sourceId: string; targetId: string } | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
@@ -60,6 +62,13 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
       graphRef.current.centerAt(node.x, node.y, 1000);
       graphRef.current.zoom(3, 1000);
     }
+  }, []);
+
+  const handleLinkClick = useCallback((link: GraphLink) => {
+    const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+    const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+    setSelectedLink({ sourceId, targetId });
+    setSelectedNode(null); // Close node panel if open
   }, []);
 
   const getNodeColor = (node: GraphNode) => {
@@ -146,7 +155,11 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
         linkDirectionalParticleSpeed={0.005}
         onNodeClick={handleNodeClick}
         onNodeRightClick={handleNodeRightClick}
-        onBackgroundClick={() => setSelectedNode(null)}
+        onLinkClick={handleLinkClick}
+        onBackgroundClick={() => {
+          setSelectedNode(null);
+          setSelectedLink(null);
+        }}
         cooldownTicks={100}
         backgroundColor="#020617"
         enableNodeDrag={true}
@@ -287,11 +300,21 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
 
         <div className="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-500">
           <div>Click: Select node</div>
+          <div>Click link: View explanation</div>
           <div>Right-click: Focus node</div>
           <div>Drag: Move nodes</div>
           <div>Scroll: Zoom in/out</div>
         </div>
       </div>
+
+      {/* Link Explanation Panel */}
+      {selectedLink && (
+        <LinkExplanationPanel
+          sourceId={selectedLink.sourceId}
+          targetId={selectedLink.targetId}
+          onClose={() => setSelectedLink(null)}
+        />
+      )}
     </div>
   );
 }
