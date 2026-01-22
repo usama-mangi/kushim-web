@@ -7,13 +7,15 @@ import {
   LayoutDashboard, Database, RefreshCw, Activity, LogOut, Shield, 
   Search, Command, ExternalLink, Clock, User, Link as LinkIcon,
   X, ChevronRight, MessageSquare, UserPlus, CheckCircle2, AlertCircle,
-  Hash, Github, Slack, FileText, Send, MoreHorizontal, Network
+  Hash, Github, Slack, FileText, Send, MoreHorizontal, Network, HelpCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import EnhancedCommandBar from '@/components/EnhancedCommandBar';
+import ProductTour from '@/components/ProductTour';
+import HelpModal from '@/components/HelpModal';
 import { toast } from 'sonner';
 
 function cn(...inputs: ClassValue[]) {
@@ -35,6 +37,7 @@ export default function AmbientFeed() {
   const [syncing, setSyncing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [commandInput, setActionInput] = useState('');
+  const [isHelpOpen, setHelpOpen] = useState(false);
 
   useSocket();
 
@@ -77,14 +80,19 @@ export default function AmbientFeed() {
         e.preventDefault();
         setCommandBarOpen(!isCommandBarOpen);
       }
+      if (e.key === '?' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setHelpOpen(!isHelpOpen);
+      }
       if (e.key === 'Escape') {
         setCommandBarOpen(false);
         setDetailPanelOpen(false);
+        setHelpOpen(false);
       }
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [isCommandBarOpen, setCommandBarOpen, setDetailPanelOpen]);
+  }, [isCommandBarOpen, isHelpOpen, setCommandBarOpen, setDetailPanelOpen]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -195,14 +203,24 @@ export default function AmbientFeed() {
           </a>
         </nav>
 
-        <button 
-          onClick={() => { localStorage.removeItem('token'); router.push('/login'); }}
-          className="p-3 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
-          aria-label="Log out"
-          title="Log out"
-        >
-          <LogOut className="w-6 h-6" aria-hidden="true" />
-        </button>
+        <div className="flex flex-col space-y-4">
+          <button 
+            onClick={() => setHelpOpen(true)}
+            className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" 
+            title="Help & Shortcuts (⌘?)"
+            aria-label="Help and keyboard shortcuts"
+          >
+            <HelpCircle className="w-6 h-6" aria-hidden="true" />
+          </button>
+          <button 
+            onClick={() => { localStorage.removeItem('token'); router.push('/login'); }}
+            className="p-3 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
+            aria-label="Log out"
+            title="Log out"
+          >
+            <LogOut className="w-6 h-6" aria-hidden="true" />
+          </button>
+        </div>
       </aside>
 
       {/* Main Feed Area */}
@@ -452,7 +470,14 @@ export default function AmbientFeed() {
           setDetailPanelOpen(true);
         }}
         onExecuteAction={executeAction}
+        onOpenHelp={() => setHelpOpen(true)}
       />
+
+      {/* Product Tour */}
+      <ProductTour />
+
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

@@ -17,6 +17,7 @@ interface EnhancedCommandBarProps {
   records: Artifact[];
   onSelectArtifact: (artifact: Artifact) => void;
   onExecuteAction: (command: string) => Promise<any>;
+  onOpenHelp?: () => void; // Optional callback to open help modal
 }
 
 type CommandMode = 'search' | 'command';
@@ -37,6 +38,7 @@ export default function EnhancedCommandBar({
   records,
   onSelectArtifact,
   onExecuteAction,
+  onOpenHelp,
 }: EnhancedCommandBarProps) {
   const [input, setInput] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -93,6 +95,12 @@ export default function EnhancedCommandBar({
   useEffect(() => {
     const firstWord = input.trim().split(/\s+/)[0]?.toLowerCase();
     const previousMode = mode;
+    
+    // Check for /help command
+    if (input.trim() === '/help' || input.trim().startsWith('/h')) {
+      setMode('search'); // Keep in search mode to show help hint
+      return;
+    }
     
     if (ACTION_VERBS.includes(firstWord)) {
       setMode('command');
@@ -238,7 +246,8 @@ export default function EnhancedCommandBar({
       if (mode === 'search') {
         announce(`Selected: ${(item as Artifact).title}`, 'polite');
       } else {
-        announce(`Selected: ${item.text}`, 'polite');
+        const suggestion = item as { text: string; label: string; platform: string };
+        announce(`Selected: ${suggestion.text}`, 'polite');
       }
     }
   }, [selectedIndex, displayItems, mode, announce]);
@@ -289,6 +298,19 @@ export default function EnhancedCommandBar({
 
     if (e.key === 'Enter') {
       e.preventDefault();
+
+      // Handle /help command
+      if (input.trim() === '/help') {
+        if (onOpenHelp) {
+          onOpenHelp();
+          onClose();
+        } else {
+          toast.info('Help Modal', {
+            description: 'Press ⌘? to open help and keyboard shortcuts',
+          });
+        }
+        return;
+      }
 
       if (mode === 'search' && displayItems.length > 0) {
         const selected = searchResults[selectedIndex];
