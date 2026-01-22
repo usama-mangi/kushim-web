@@ -1,6 +1,8 @@
 'use client';
 
 import { useDashboardStore, Artifact, ContextGroup } from '@/store/useStore';
+import { useActionHistoryStore } from '@/store/useActionHistoryStore';
+import { executeUndo, executeRedo, getActionDescription, canUndoAction } from '@/lib/undo';
 import { useSocket } from '@/hooks/useSocket';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
@@ -31,6 +33,8 @@ export default function AmbientFeed() {
     isDetailPanelOpen, setDetailPanelOpen,
     isCommandBarOpen, setCommandBarOpen
   } = useDashboardStore();
+  
+  const { canUndo, canRedo, undo, redo } = useActionHistoryStore();
   
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -77,14 +81,27 @@ export default function AmbientFeed() {
   // Keyboard Shortcuts
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      // Command Bar
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setCommandBarOpen(!isCommandBarOpen);
       }
+      // Help Modal
       if (e.key === '?' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setHelpOpen(!isHelpOpen);
       }
+      // Undo
+      if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      // Redo
+      if (e.key === 'z' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      }
+      // Escape
       if (e.key === 'Escape') {
         setCommandBarOpen(false);
         setDetailPanelOpen(false);
@@ -124,6 +141,71 @@ export default function AmbientFeed() {
     );
     return res.data;
   };
+
+  const handleUndo = useCallback(async () => {
+    if (!canUndo()) {
+      toast.info('Nothing to undo');
+      return;
+    }
+
+    const actionToUndo = undo();
+    if (!actionToUndo) return;
+
+    if (!canUndoAction(actionToUndo)) {
+      toast.error('Cannot undo', {
+        description: `${actionToUndo.type} actions cannot be undone`,
+      });
+      return;
+    }
+
+    const description = getActionDescription(actionToUndo);
+    toast.loading('Undoing action...', { id: 'undo-toast' });
+
+    const result = await executeUndo(actionToUndo);
+    
+    if (result.success) {
+      toast.success('Undone', {
+        id: 'undo-toast',
+        description,
+      });
+      // Refresh data
+      setTimeout(fetchData, 1000);
+    } else {
+      toast.error('Undo failed', {
+        id: 'undo-toast',
+        description: result.error,
+      });
+    }
+  }, [canUndo, undo, fetchData]);
+
+  const handleRedo = useCallback(async () => {
+    if (!canRedo()) {
+      toast.info('Nothing to redo');
+      return;
+    }
+
+    const actionToRedo = redo();
+    if (!actionToRedo) return;
+
+    const description = getActionDescription(actionToRedo);
+    toast.loading('Redoing action...', { id: 'redo-toast' });
+
+    const result = await executeRedo(actionToRedo);
+    
+    if (result.success) {
+      toast.success('Redone', {
+        id: 'redo-toast',
+        description,
+      });
+      // Refresh data
+      setTimeout(fetchData, 1000);
+    } else {
+      toast.error('Redo failed', {
+        id: 'redo-toast',
+        description: result.error,
+      });
+    }
+  }, [canRedo, redo, fetchData]);
 
   const filteredRecords = useMemo(() => {
     if (!searchQuery) return [];

@@ -18,6 +18,8 @@ type TabId = 'shortcuts' | 'commands' | 'graph' | 'faq';
 const KEYBOARD_SHORTCUTS = [
   { keys: ['⌘', 'K'], action: 'Open command bar', mac: '⌘K', windows: 'Ctrl+K' },
   { keys: ['⌘', '?'], action: 'Open help modal', mac: '⌘?', windows: 'Ctrl+?' },
+  { keys: ['⌘', 'Z'], action: 'Undo last action', mac: '⌘Z', windows: 'Ctrl+Z' },
+  { keys: ['⌘', '⇧', 'Z'], action: 'Redo action', mac: '⌘⇧Z', windows: 'Ctrl+Shift+Z' },
   { keys: ['Esc'], action: 'Close panels/modals', mac: 'Esc', windows: 'Esc' },
   { keys: ['↑'], action: 'Recall previous command', mac: '↑', windows: '↑' },
   { keys: ['↓'], action: 'Navigate command history', mac: '↓', windows: '↓' },
@@ -69,6 +71,10 @@ const GRAPH_CONTROLS = [
 
 const FAQ_ITEMS = [
   {
+    question: 'Can I undo an action?',
+    answer: 'Yes! Press ⌘Z (Ctrl+Z on Windows) to undo your last action. You can undo up to 10 recent actions. Press ⌘Shift+Z (Ctrl+Shift+Z) to redo. Currently, only close, assign, and link actions can be undone.',
+  },
+  {
     question: 'What is deterministic linking?',
     answer: 'Deterministic linking uses explicit signals like artifact IDs, shared URLs, and participant overlap to create guaranteed connections between related work items. No guessing - only proven relationships.',
   },
@@ -82,11 +88,11 @@ const FAQ_ITEMS = [
   },
   {
     question: 'How do I manually link two artifacts?',
-    answer: 'Use the command: "link <artifact-1> <artifact-2>". For example: "link PR-123 ISSUE-456". This creates a manual link that ML will learn from.',
+    answer: 'Use the command: "link <artifact-1> <artifact-2>". For example: "link PR-123 ISSUE-456". This creates a manual link that ML will learn from. You can undo this with ⌘Z.',
   },
   {
     question: 'Can I undo an action?',
-    answer: 'Currently, undo functionality is in development (Phase 4). For now, you can manually reverse actions through the platform\'s native UI.',
+    answer: 'Yes! Press ⌘Z (Ctrl+Z on Windows) to undo your last action. You can undo up to 10 recent actions. Press ⌘Shift+Z (Ctrl+Shift+Z) to redo. Currently, only close, assign, and link actions can be undone.',
   },
   {
     question: 'How often does Kushim sync data?',

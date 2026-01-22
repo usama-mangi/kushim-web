@@ -9,6 +9,7 @@ import {
 import Fuse from 'fuse.js';
 import { toast } from 'sonner';
 import { Artifact } from '@/store/useStore';
+import { useActionHistoryStore, ActionType } from '@/store/useActionHistoryStore';
 import { useA11yAnnounce } from '@/hooks/useA11y';
 
 interface EnhancedCommandBarProps {
@@ -51,6 +52,7 @@ export default function EnhancedCommandBar({
   const [showOnboarding, setShowOnboarding] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const announce = useA11yAnnounce();
+  const { recordAction } = useActionHistoryStore();
   
   // Generate unique IDs for ARIA
   const comboboxId = 'command-bar-combobox';
@@ -349,6 +351,25 @@ export default function EnhancedCommandBar({
     try {
       const result = await onExecuteAction(command);
       saveToHistory(command);
+      
+      // Record action for undo/redo
+      const parts = command.trim().split(/\s+/);
+      const verb = parts[0]?.toLowerCase() as ActionType;
+      const target = parts[1];
+      const payload = parts.slice(2).join(' ');
+      const secondTarget = verb === 'link' ? parts[2] : undefined;
+
+      if (ACTION_VERBS.includes(verb)) {
+        recordAction({
+          type: verb,
+          command,
+          target,
+          payload,
+          secondTarget,
+          result,
+        });
+      }
+      
       toast.success('Command executed successfully', {
         description: result?.message || validation.preview || command,
       });
