@@ -7,7 +7,8 @@ import {
   LayoutDashboard, Database, RefreshCw, Activity, LogOut, Shield, 
   Search, Command, ExternalLink, Clock, User, Link as LinkIcon,
   X, ChevronRight, MessageSquare, UserPlus, CheckCircle2, AlertCircle,
-  Hash, Github, Slack, FileText, Send, MoreHorizontal, Network, HelpCircle
+  Hash, Github, Slack, FileText, Send, MoreHorizontal, Network, HelpCircle,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -200,6 +201,14 @@ export default function AmbientFeed() {
             aria-label="Security"
           >
             <Shield className="w-6 h-6" aria-hidden="true" />
+          </a>
+          <a 
+            href="/settings" 
+            className="p-3 text-slate-500 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-all" 
+            title="Settings"
+            aria-label="Settings"
+          >
+            <SettingsIcon className="w-6 h-6" aria-hidden="true" />
           </a>
         </nav>
 
