@@ -8,13 +8,32 @@ export class RecordsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  findAll(@Query('search') search?: string, @Query('source') source?: string) {
-    return this.recordsService.findAll({ search, source });
+  findAll(
+    @Query('search') search?: string,
+    @Query('source') source?: string,
+    @Query('type') type?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.recordsService.findAll({
+      search,
+      source,
+      type,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('context-groups')
-  findContextGroups(@Request() req: any) {
-    return this.recordsService.findContextGroups(req.user.userId);
+  findContextGroups(
+    @Request() req: any,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.recordsService.findContextGroups(req.user.userId, {
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
   }
 }

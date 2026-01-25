@@ -11,9 +11,15 @@ export class RecordsService {
   ) {}
 
   async findAll(
-    params: { search?: string; source?: string; type?: string } = {},
+    params: { 
+      search?: string; 
+      source?: string; 
+      type?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
   ) {
-    const { search, source, type } = params;
+    const { search, source, type, limit = 100, offset = 0 } = params;
     const where: Prisma.UnifiedRecordWhereInput = {};
 
     if (source) {
@@ -31,17 +37,34 @@ export class RecordsService {
       ];
     }
 
-    return this.prisma.unifiedRecord.findMany({
-      where,
-      orderBy: { timestamp: 'desc' },
-      include: {
-        source: {
-          select: {
-            providerName: true,
+    // Batch query with pagination
+    const [records, total] = await Promise.all([
+      this.prisma.unifiedRecord.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        take: Math.min(limit, 100), // Cap at 100 for performance
+        skip: offset,
+        include: {
+          source: {
+            select: {
+              providerName: true,
+              status: true,
+            },
           },
         },
+      }),
+      this.prisma.unifiedRecord.count({ where }),
+    ]);
+
+    return {
+      records,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + records.length < total,
       },
-    });
+    };
   }
 
   async findOne(id: string) {
@@ -50,7 +73,7 @@ export class RecordsService {
     });
   }
 
-  async findContextGroups(userId: string) {
-    return this.graphService.getContextGroups(userId);
+  async findContextGroups(userId: string, options?: { limit?: number; offset?: number }) {
+    return this.graphService.getContextGroups(userId, options);
   }
 }

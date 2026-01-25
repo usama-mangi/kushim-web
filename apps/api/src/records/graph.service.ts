@@ -538,7 +538,9 @@ export class GraphService {
     this.logger.log(`Removed artifact ${recordId} from group ${groupId}`);
   }
 
-  async getContextGroups(userId: string) {
+  async getContextGroups(userId: string, options: { limit?: number; offset?: number } = {}) {
+    const { limit = 50, offset = 0 } = options;
+    
     const cypher = `
       MATCH (g:ContextGroup)
       WHERE EXISTS {
@@ -546,10 +548,19 @@ export class GraphService {
         WHERE a.userId = $userId
       }
       OPTIONAL MATCH (a:Artifact)-[r:BELONGS_TO]->(g)
-      RETURN g, collect({node: a, rel: r}) as members
+      WITH g, collect({node: a, rel: r}) as members
       ORDER BY g.updatedAt DESC
+      SKIP $offset
+      LIMIT $limit
+      RETURN g, members
     `;
-    const result = await this.neo4jService.run(cypher, { userId });
+    
+    const result = await this.neo4jService.run(cypher, { 
+      userId,
+      offset: neo4j.int(offset),
+      limit: neo4j.int(limit),
+    });
+    
     return result.map(r => {
       const groupProps = r.get('g').properties;
       return {
