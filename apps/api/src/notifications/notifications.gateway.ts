@@ -42,4 +42,10 @@ export class NotificationsGateway
       this.server.emit(event, payload);
     }
   }
+
+  sendToUser(userId: string, event: string, payload: any) {
+    const userRoom = `user:${userId}`;
+    this.server.to(userRoom).emit(event, payload);
+    this.logger.log(`Sent ${event} to user ${userId}`);
+  }
 }

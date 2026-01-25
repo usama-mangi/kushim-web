@@ -22,93 +22,122 @@ export class RelationshipService {
   ) {}
 
   async discoverRelationships(newRecord: UnifiedRecord) {
-    // Use graph-based candidate discovery for better performance
-    const candidates = await this.graphService.findLinkingCandidates(
-      newRecord.id,
-      newRecord.userId,
-      100
-    );
-
-    for (const candidate of candidates) {
-      const deterministicScore = await this.calculateLinkScoreOptimized(newRecord, candidate);
-
-      // Calculate ML score (hybrid: deterministic + semantic + structural)
-      const mlScoreResult = await this.mlScoringService.calculateMLScore(
-        newRecord,
-        candidate,
-        deterministicScore,
-      );
-
-      // Hybrid decision logic (ML Specs Phase 3)
-      let shouldCreateLink = false;
-      let finalScore = deterministicScore;
-      let discoveryMethod = 'deterministic';
-      let explanation = {};
-
-      if (deterministicScore >= this.DETERMINISTIC_THRESHOLD) {
-        // Deterministic link (existing behavior)
-        shouldCreateLink = true;
-        finalScore = deterministicScore;
-        discoveryMethod = 'deterministic';
-        explanation = {
-          deterministicScore,
-          mlScore: mlScoreResult.mlScore,
-          method: 'deterministic',
-          reason: 'Deterministic signals exceeded threshold',
-        };
-      } else if (
-        this.ML_ENABLED &&
-        mlScoreResult.mlScore >= this.ML_THRESHOLD
-      ) {
-        // ML-assisted link (new behavior)
-        shouldCreateLink = true;
-        finalScore = mlScoreResult.mlScore;
-        discoveryMethod = 'ml_assisted';
-        explanation = {
-          deterministicScore,
-          mlScore: mlScoreResult.mlScore,
-          semanticScore: mlScoreResult.semanticScore,
-          structuralScore: mlScoreResult.structuralScore,
-          method: 'ml_assisted',
-          reason: 'ML scoring exceeded threshold',
-        };
-        this.logger.log(
-          `ML-assisted link: ${newRecord.externalId} <-> ${candidate.externalId} ` +
-          `(ML: ${mlScoreResult.mlScore.toFixed(2)}, Det: ${deterministicScore.toFixed(2)})`,
-        );
-      } else {
-        // No link created, but log shadow score for analysis
-        explanation = {
-          deterministicScore,
-          mlScore: mlScoreResult.mlScore,
-          semanticScore: mlScoreResult.semanticScore,
-          structuralScore: mlScoreResult.structuralScore,
-          method: 'rejected',
-          reason: 'Below both thresholds',
-        };
-      }
-
-      // Always persist shadow link for evaluation
-      await this.mlScoringService.persistShadowLink(
+    // Wrap in transaction to prevent race conditions
+    return await this.prisma.$transaction(async (tx) => {
+      // Hybrid fetch: Use Neo4j for fast graph-based candidate discovery (IDs only),
+      // then hydrate with full records from PostgreSQL (includes embeddings)
+      const candidateIds = await this.graphService.findLinkingCandidateIds(
         newRecord.id,
-        candidate.id,
-        deterministicScore,
-        mlScoreResult.semanticScore,
-        mlScoreResult.structuralScore,
-        mlScoreResult.mlScore,
+        newRecord.userId,
+        100
       );
 
-      if (shouldCreateLink) {
-        await this.createLink(
+      const candidates = await this.graphService.hydrateRecordsFromIds(candidateIds);
+
+      for (const candidate of candidates) {
+        const deterministicScore = await this.calculateLinkScoreOptimized(newRecord, candidate);
+
+        // Calculate ML score (hybrid: deterministic + semantic + structural)
+        const mlScoreResult = await this.mlScoringService.calculateMLScore(
           newRecord,
           candidate,
-          finalScore,
-          discoveryMethod,
-          explanation,
+          deterministicScore,
         );
-        await this.updateContextGroups(newRecord, candidate);
+
+        // Hybrid decision logic (ML Specs Phase 3)
+        let shouldCreateLink = false;
+        let finalScore = deterministicScore;
+        let discoveryMethod = 'deterministic';
+        let explanation = {};
+
+        if (deterministicScore >= this.DETERMINISTIC_THRESHOLD) {
+          // Deterministic link (existing behavior)
+          shouldCreateLink = true;
+          finalScore = deterministicScore;
+          discoveryMethod = 'deterministic';
+          explanation = {
+            deterministicScore,
+            mlScore: mlScoreResult.mlScore,
+            method: 'deterministic',
+            reason: 'Deterministic signals exceeded threshold',
+          };
+        } else if (
+          this.ML_ENABLED &&
+          mlScoreResult.mlScore >= this.ML_THRESHOLD
+        ) {
+          // ML-assisted link (new behavior)
+          shouldCreateLink = true;
+          finalScore = mlScoreResult.mlScore;
+          discoveryMethod = 'ml_assisted';
+          explanation = {
+            deterministicScore,
+            mlScore: mlScoreResult.mlScore,
+            semanticScore: mlScoreResult.semanticScore,
+            structuralScore: mlScoreResult.structuralScore,
+            method: 'ml_assisted',
+            reason: 'ML scoring exceeded threshold',
+          };
+          this.logger.log(
+            `ML-assisted link: ${newRecord.externalId} <-> ${candidate.externalId} ` +
+            `(ML: ${mlScoreResult.mlScore.toFixed(2)}, Det: ${deterministicScore.toFixed(2)})`,
+          );
+        } else {
+          // No link created, but log shadow score for analysis
+          explanation = {
+            deterministicScore,
+            mlScore: mlScoreResult.mlScore,
+            semanticScore: mlScoreResult.semanticScore,
+            structuralScore: mlScoreResult.structuralScore,
+            method: 'rejected',
+            reason: 'Below both thresholds',
+          };
+        }
+
+        // Always persist shadow link for evaluation
+        await this.mlScoringService.persistShadowLink(
+          newRecord.id,
+          candidate.id,
+          deterministicScore,
+          mlScoreResult.semanticScore,
+          mlScoreResult.structuralScore,
+          mlScoreResult.mlScore,
+        );
+
+        if (shouldCreateLink) {
+          // Check for existing link before creating (idempotency)
+          const [sourceId, targetId] =
+            newRecord.timestamp < candidate.timestamp 
+              ? [newRecord.id, candidate.id] 
+              : [candidate.id, newRecord.id];
+
+          const existingLink = await tx.link.findUnique({
+            where: {
+              sourceRecordId_targetRecordId: {
+                sourceRecordId: sourceId,
+                targetRecordId: targetId,
+              },
+            },
+          });
+
+          // Only create/update if necessary
+          if (!existingLink || existingLink.confidenceScore < finalScore) {
+            await this.createLinkWithTransaction(
+              tx,
+              newRecord,
+              candidate,
+              finalScore,
+              discoveryMethod,
+              explanation,
+            );
+            await this.updateContextGroups(newRecord, candidate);
+          }
+        }
       }
-    }
+    }, {
+      isolationLevel: 'Serializable', // Prevent race conditions
+      maxWait: 5000, // Maximum wait time in ms
+      timeout: 30000, // Maximum transaction time in ms
+    });
   }
 
   private async calculateLinkScoreOptimized(a: UnifiedRecord, b: any): Promise<number> {
@@ -237,10 +266,28 @@ export class RelationshipService {
     discoveryMethod: string = 'deterministic',
     explanation: any = {},
   ) {
+    return await this.createLinkWithTransaction(
+      this.prisma,
+      a,
+      b,
+      score,
+      discoveryMethod,
+      explanation,
+    );
+  }
+
+  private async createLinkWithTransaction(
+    tx: any, // PrismaClient or TransactionClient
+    a: UnifiedRecord,
+    b: UnifiedRecord,
+    score: number,
+    discoveryMethod: string = 'deterministic',
+    explanation: any = {},
+  ) {
     const [sourceId, targetId] =
       a.timestamp < b.timestamp ? [a.id, b.id] : [b.id, a.id];
 
-    const link = await this.prisma.link.upsert({
+    const link = await tx.link.upsert({
       where: {
         sourceRecordId_targetRecordId: {
           sourceRecordId: sourceId,
@@ -263,26 +310,30 @@ export class RelationshipService {
     });
 
     await this.graphService.syncLink(link);
+    return link;
   }
 
   private async updateContextGroups(a: UnifiedRecord, b: UnifiedRecord) {
     const aGroups = await this.graphService.getRecordGroups(a.id);
     const bGroups = await this.graphService.getRecordGroups(b.id);
 
+    // Both records should have the same userId (verified by earlier tenant checks)
+    const userId = a.userId;
+
     if (aGroups.length === 0 && bGroups.length === 0) {
       // New Cluster
       const title = `Context: ${a.title.substring(0, 30)}...`;
-      const groupId = await this.graphService.createContextGroup(a.id, b.id, title);
+      const groupId = await this.graphService.createContextGroup(a.id, b.id, userId, title);
       this.logger.log(`Created new graph context group ${groupId}`);
     } else if (aGroups.length > 0 && bGroups.length === 0) {
       // Add B to A's groups
       for (const groupId of aGroups) {
-        await this.graphService.addToContextGroup(groupId, b.id);
+        await this.graphService.addToContextGroup(groupId, b.id, userId);
       }
     } else if (aGroups.length === 0 && bGroups.length > 0) {
       // Add A to B's groups
       for (const groupId of bGroups) {
-        await this.graphService.addToContextGroup(groupId, a.id);
+        await this.graphService.addToContextGroup(groupId, a.id, userId);
       }
     } else {
       // Merge if different
@@ -293,7 +344,7 @@ export class RelationshipService {
       const targetGroup = aGroups[0];
       for (const sourceGroup of bGroups) {
         if (sourceGroup !== targetGroup) {
-            await this.graphService.mergeContextGroups(targetGroup, sourceGroup);
+            await this.graphService.mergeContextGroups(targetGroup, sourceGroup, userId);
             this.logger.log(`Merged group ${sourceGroup} into ${targetGroup}`);
         }
       }

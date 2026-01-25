@@ -92,15 +92,21 @@ export class MLScoringService {
       const embeddingB = this.parseEmbedding(b.embedding);
 
       if (!embeddingA || !embeddingB) {
-        this.logger.debug(
-          `Missing embeddings for ${a.externalId} or ${b.externalId}, using fallback`,
+        this.logger.warn(
+          `Missing embeddings for ${a.externalId} or ${b.externalId}, using fallback. ` +
+          `This may indicate failed embedding generation during ingestion.`,
         );
         return this.fallbackSemanticSimilarity(a, b);
       }
 
+      // Embeddings present - use cosine similarity for accurate semantic scoring
       const similarity = this.embeddingService.cosineSimilarity(
         embeddingA,
         embeddingB,
+      );
+
+      this.logger.debug(
+        `Semantic similarity (cosine): ${similarity.toFixed(3)} for ${a.externalId} <-> ${b.externalId}`,
       );
 
       return Math.max(0, Math.min(1, similarity));

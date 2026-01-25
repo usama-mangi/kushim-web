@@ -23,9 +23,66 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Kushim API - Backend service for the Kushim ambient ledger system.
+
+## Prerequisites
+
+- Node.js (v18 or higher)
+- PostgreSQL (v14 or higher)
+- Neo4j (v5 or higher)
+- Redis (optional, for caching and distributed locking)
+
+## Environment Variables
+
+**Required environment variables:**
+
+1. **ENCRYPTION_KEY** - 64-character hex string (32 bytes) for encrypting sensitive data
+   - Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+   
+2. **DATABASE_URL** - PostgreSQL connection string
+   - Format: `postgresql://username:password@localhost:5432/kushim_db?schema=public`
+
+3. **NEO4J_URI** - Neo4j connection URI
+   - Example: `bolt://localhost:7687`
+
+4. **NEO4J_USERNAME** - Neo4j username (default: `neo4j`)
+
+5. **NEO4J_PASSWORD** - Neo4j password
+
+6. **JWT_SECRET** - Secret for JWT token signing
+   - Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+**OAuth Provider Credentials (required for integrations):**
+
+- GitHub: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_CALLBACK_URL`
+- Jira: `JIRA_CLIENT_ID`, `JIRA_CLIENT_SECRET`, `JIRA_CALLBACK_URL`
+- Slack: `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_CALLBACK_URL`
+- Google: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`
+
+**Optional:**
+- `REDIS_HOST`, `REDIS_PORT` - Redis configuration for caching
+- `PORT` - API port (default: 3001)
+- `FRONTEND_URL` - Frontend application URL (default: http://localhost:3000)
+
+See `.env.example` for a complete template.
 
 ## Project setup
+
+```bash
+# Install dependencies
+$ npm install
+
+# Copy environment template
+$ cp .env.example .env
+
+# Generate encryption key
+$ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# Update .env with your configuration
+
+# Run database migrations
+$ npx prisma migrate deploy
+```
 
 ```bash
 $ npm install

@@ -11,6 +11,7 @@ import { EmbeddingService } from '../common/embedding.service';
 import { AuditService } from '../audit/audit.service';
 import { RelationshipService } from '../records/relationship.service';
 import { GraphService } from '../records/graph.service';
+import { OAuthService } from './oauth.service';
 
 @Injectable()
 export class IngestionService {
@@ -25,6 +26,7 @@ export class IngestionService {
     private auditService: AuditService,
     private relationshipService: RelationshipService,
     private graphService: GraphService,
+    private oauthService: OAuthService,
   ) {
     this.adapters.set('github', new GithubAdapter());
     this.adapters.set('jira', new JiraAdapter());
@@ -81,7 +83,115 @@ export class IngestionService {
       const lastSync = dataSource.lastSync
         ? new Date(dataSource.lastSync)
         : undefined;
-      const rawData = await adapter.fetch(credentials, lastSync);
+      
+      let rawData: any[];
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          rawData = await adapter.fetch(credentials, lastSync);
+          break; // Success, exit retry loop
+        } catch (error) {
+          // Check if it's a 401 error (token expired)
+          const creds = credentials as any;
+          const is401 = error.message?.includes('401') || (error as any)?.statusCode === 401;
+          
+          if (
+            is401 &&
+            retryCount === 0 && // Only try refresh once
+            (creds?.refreshToken || creds?.refresh_token)
+          ) {
+            const refreshToken = creds.refreshToken || creds.refresh_token;
+            
+            // Try refreshing token for providers that support it
+            if (['jira', 'google', 'github'].includes(dataSource.providerName)) {
+              try {
+                this.logger.log(`Access token expired for ${dataSource.providerName}, refreshing...`);
+                
+                const refreshedTokens = await this.oauthService.refreshAccessToken(
+                  dataSource.providerName,
+                  refreshToken,
+                );
+
+                // Update credentials with new access token
+                // Handle different credential structures per provider
+                if (dataSource.providerName === 'github') {
+                  credentials = {
+                    ...creds,
+                    token: refreshedTokens.token,
+                    refresh_token: refreshedTokens.refresh_token || refreshToken,
+                    expires_at: refreshedTokens.expires_at,
+                  };
+                } else if (dataSource.providerName === 'google') {
+                  credentials = {
+                    ...creds,
+                    access_token: refreshedTokens.access_token,
+                    refresh_token: refreshedTokens.refresh_token || refreshToken,
+                    expires_at: refreshedTokens.expires_at,
+                  };
+                } else if (dataSource.providerName === 'jira') {
+                  credentials = {
+                    ...creds,
+                    accessToken: refreshedTokens.accessToken,
+                    refreshToken: refreshedTokens.refreshToken || refreshToken,
+                    expires_at: refreshedTokens.expires_at,
+                  };
+                }
+
+                // Encrypt and save updated credentials
+                const encryptedCredentials = await this.encryptionService.encryptObject(credentials);
+                await this.prisma.dataSource.update({
+                  where: { id: dataSourceId },
+                  data: { credentialsEncrypted: encryptedCredentials },
+                });
+
+                this.logger.log(`Token refreshed for ${dataSource.providerName}, retrying fetch...`);
+                
+                retryCount++;
+                continue; // Retry fetch with new token
+              } catch (refreshError) {
+                this.logger.error(`Token refresh failed for ${dataSource.providerName}`, refreshError);
+                
+                // Mark data source as requiring re-auth
+                await this.prisma.dataSource.update({
+                  where: { id: dataSourceId },
+                  data: { 
+                    status: 'reauth_required',
+                    metadata: {
+                      error: 'Token refresh failed',
+                      message: 'Please reconnect your account',
+                      timestamp: new Date().toISOString(),
+                    },
+                  },
+                });
+
+                // Notify user via WebSocket
+                this.notificationsGateway.sendToUser(dataSource.userId, 'authRequired', {
+                  provider: dataSource.providerName,
+                  message: 'Your authentication has expired. Please reconnect your account.',
+                });
+
+                throw new Error(`Authentication expired for ${dataSource.providerName}. Please reconnect.`);
+              }
+            }
+          }
+          
+          // If not a 401 or refresh not supported, implement exponential backoff for other errors
+          if (retryCount < maxRetries) {
+            const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 10000); // Max 10s
+            this.logger.warn(
+              `Fetch failed for ${dataSource.providerName} (attempt ${retryCount + 1}/${maxRetries + 1}). Retrying in ${backoffMs}ms...`,
+            );
+            await new Promise(resolve => setTimeout(resolve, backoffMs));
+            retryCount++;
+          } else {
+            // Max retries exceeded
+            throw error;
+          }
+        }
+      }
+
       let newCount = 0;
 
       for (const raw of rawData) {

@@ -78,7 +78,9 @@ export class JiraAdapter extends BaseAdapter {
       if (!response.ok) {
         const errText = await response.text();
         console.error(`Jira API Error ${response.status}: ${errText}`);
-        throw new Error(`Jira API Request failed: ${response.status} ${response.statusText}`);
+        const error = new Error(`Jira API Request failed: ${response.status} ${response.statusText}`);
+        (error as any).statusCode = response.status; // Preserve status code
+        throw error;
       }
 
       const data: any = await response.json();
@@ -86,7 +88,8 @@ export class JiraAdapter extends BaseAdapter {
 
     } catch (error) {
       console.error('Jira API Error:', error);
-      throw new Error('Failed to fetch data from Jira');
+      // Re-throw original error to preserve status code information
+      throw error;
     }
   }
 

@@ -8,16 +8,25 @@ export class EncryptionService {
   private readonly key: Buffer;
 
   constructor() {
-    // In production, this should be a 32-byte hex string from env
+    // In production, ENCRYPTION_KEY must be set to a secure 32-byte hex string
     const envKey = process.env.ENCRYPTION_KEY;
     if (!envKey) {
-      console.warn(
-        'WARNING: ENCRYPTION_KEY not set. Using insecure default for dev.',
+      throw new Error(
+        'ENCRYPTION_KEY environment variable is required. ' +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
       );
-      this.key = Buffer.alloc(32, 'insecure-default-key-for-dev-only');
-    } else {
-      this.key = Buffer.from(envKey, 'hex');
     }
+    
+    // Validate key length
+    const keyBuffer = Buffer.from(envKey, 'hex');
+    if (keyBuffer.length !== 32) {
+      throw new Error(
+        'ENCRYPTION_KEY must be a 64-character hex string (32 bytes). ' +
+        'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+      );
+    }
+    
+    this.key = keyBuffer;
   }
 
   async encrypt(text: string): Promise<string> {

@@ -84,11 +84,9 @@ export class GraphController {
     const cypher = `
       MATCH (g:ContextGroup {id: $groupId})<-[:BELONGS_TO]-(a:Artifact)
       WHERE a.userId = $userId
-      WITH collect(a) as artifacts
       
-      // Get all artifacts as nodes
-      UNWIND artifacts as a
-      WITH artifacts, {
+      // Build nodes list with DISTINCT
+      WITH collect(DISTINCT {
         id: a.id,
         label: a.title,
         type: 'artifact',
@@ -98,24 +96,25 @@ export class GraphController {
           url: a.url,
           createdAt: a.timestamp
         }
-      } as node
+      }) as nodes
       
-      WITH artifacts, collect(node) as nodes
-      
-      // Get all relationships between these artifacts
-      UNWIND artifacts as a1
-      UNWIND artifacts as a2
-      WITH nodes, a1, a2
-      WHERE id(a1) < id(a2)
+      // Build links separately - only actual relationships within this group
+      MATCH (g:ContextGroup {id: $groupId})<-[:BELONGS_TO]-(a1:Artifact)
+      MATCH (g)<-[:BELONGS_TO]-(a2:Artifact)
+      WHERE a1.userId = $userId 
+        AND a2.userId = $userId
+        AND id(a1) < id(a2)
       OPTIONAL MATCH (a1)-[r:RELATED_TO]-(a2)
-      WITH nodes, collect({
+      WHERE r IS NOT NULL
+      
+      WITH nodes, collect(DISTINCT {
         source: a1.id,
         target: a2.id,
         confidence: r.confidence,
         signal: r.method
       }) as links
       
-      RETURN nodes, [link IN links WHERE link.confidence IS NOT NULL] as links
+      RETURN nodes, links
     `;
 
     const result = await this.graphService['neo4jService'].run(cypher, {
@@ -139,11 +138,9 @@ export class GraphController {
     const cypher = `
       MATCH (a:Artifact)
       WHERE a.userId = $userId
-      WITH collect(a) as artifacts
       
-      // Get all artifacts as nodes
-      UNWIND artifacts as a
-      WITH artifacts, {
+      // Build nodes list with DISTINCT to avoid duplicates
+      WITH collect(DISTINCT {
         id: a.id,
         label: a.title,
         type: 'artifact',
@@ -153,24 +150,22 @@ export class GraphController {
           url: a.url,
           createdAt: a.timestamp
         }
-      } as node
+      }) as nodes
       
-      WITH artifacts, collect(node) as nodes
+      // Build links separately - only get actual relationships
+      MATCH (a1:Artifact)-[r:RELATED_TO]-(a2:Artifact)
+      WHERE a1.userId = $userId 
+        AND a2.userId = $userId
+        AND id(a1) < id(a2)
       
-      // Get all relationships
-      UNWIND artifacts as a1
-      UNWIND artifacts as a2
-      WITH nodes, a1, a2
-      WHERE id(a1) < id(a2)
-      OPTIONAL MATCH (a1)-[r:RELATED_TO]-(a2)
-      WITH nodes, collect({
+      WITH nodes, collect(DISTINCT {
         source: a1.id,
         target: a2.id,
         confidence: r.confidence,
         signal: r.method
       }) as links
       
-      RETURN nodes, [link IN links WHERE link.confidence IS NOT NULL] as links
+      RETURN nodes, links
     `;
 
     const result = await this.graphService['neo4jService'].run(cypher, {

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Neo4jService } from '../neo4j/neo4j.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { UnifiedRecord, Link } from '@prisma/client';
 import neo4j from 'neo4j-driver';
 
@@ -7,73 +8,163 @@ import neo4j from 'neo4j-driver';
 export class GraphService {
   private readonly logger = new Logger(GraphService.name);
 
-  constructor(private neo4jService: Neo4jService) {}
+  constructor(
+    private neo4jService: Neo4jService,
+    private prisma: PrismaService,
+  ) {}
 
   async syncRecord(record: UnifiedRecord) {
-    const cypher = `
-      MERGE (a:Artifact {id: $id})
-      SET a.title = $title,
-          a.externalId = $externalId,
-          a.platform = $platform,
-          a.type = $type,
-          a.url = $url,
-          a.timestamp = $timestamp,
-          a.userId = $userId,
-          a.participants = $participants,
-          a.metadata = $metadata,
-          a.body = $body
-    `;
-    
-    await this.neo4jService.run(cypher, {
-      id: record.id,
-      title: record.title,
-      externalId: record.externalId,
-      platform: record.sourcePlatform,
-      type: record.artifactType,
-      url: record.url || '',
-      timestamp: record.timestamp.toISOString(),
-      userId: record.userId,
-      participants: record.participants,
-      metadata: JSON.stringify(record.metadata),
-      body: record.body.substring(0, 1000) // Truncate body for graph performance
-    });
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount <= maxRetries) {
+      try {
+        const cypher = `
+          MERGE (a:Artifact {id: $id})
+          SET a.title = $title,
+              a.externalId = $externalId,
+              a.platform = $platform,
+              a.type = $type,
+              a.url = $url,
+              a.timestamp = $timestamp,
+              a.userId = $userId,
+              a.participants = $participants,
+              a.metadata = $metadata,
+              a.body = $body
+        `;
+        
+        await this.neo4jService.run(cypher, {
+          id: record.id,
+          title: record.title,
+          externalId: record.externalId,
+          platform: record.sourcePlatform,
+          type: record.artifactType,
+          url: record.url || '',
+          timestamp: record.timestamp.toISOString(),
+          userId: record.userId,
+          participants: record.participants,
+          metadata: JSON.stringify(record.metadata),
+          body: record.body.substring(0, 1000) // Truncate body for graph performance
+        });
+        
+        this.logger.debug(`Successfully synced record ${record.id} to Neo4j`);
+        return; // Success, exit retry loop
+      } catch (error) {
+        retryCount++;
+        
+        if (retryCount > maxRetries) {
+          this.logger.error(
+            `Failed to sync record ${record.id} to Neo4j after ${maxRetries} retries`,
+            error,
+          );
+          
+          // Log sync failure for reconciliation
+          await this.logSyncFailure('record', record.id, error.message);
+          
+          throw new Error(`Neo4j sync failed for record ${record.id}: ${error.message}`);
+        }
+        
+        // Exponential backoff
+        const backoffMs = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+        this.logger.warn(
+          `Neo4j sync failed for record ${record.id} (attempt ${retryCount}/${maxRetries}). Retrying in ${backoffMs}ms...`,
+        );
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
+    }
   }
 
   async syncLink(link: Link) {
-    const cypher = `
-      MATCH (s:Artifact {id: $sourceId})
-      MATCH (t:Artifact {id: $targetId})
-      MERGE (s)-[r:RELATED_TO]->(t)
-      SET r.confidence = $confidence,
-          r.type = $type,
-          r.method = $method
-    `;
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    await this.neo4jService.run(cypher, {
-      sourceId: link.sourceRecordId,
-      targetId: link.targetRecordId,
-      confidence: link.confidenceScore,
-      type: link.relationshipType,
-      method: link.discoveryMethod
-    });
+    while (retryCount <= maxRetries) {
+      try {
+        const cypher = `
+          MATCH (s:Artifact {id: $sourceId})
+          MATCH (t:Artifact {id: $targetId})
+          MERGE (s)-[r:RELATED_TO]->(t)
+          SET r.confidence = $confidence,
+              r.type = $type,
+              r.method = $method
+        `;
+
+        await this.neo4jService.run(cypher, {
+          sourceId: link.sourceRecordId,
+          targetId: link.targetRecordId,
+          confidence: link.confidenceScore,
+          type: link.relationshipType,
+          method: link.discoveryMethod
+        });
+        
+        this.logger.debug(`Successfully synced link ${link.id} to Neo4j`);
+        return; // Success, exit retry loop
+      } catch (error) {
+        retryCount++;
+        
+        if (retryCount > maxRetries) {
+          this.logger.error(
+            `Failed to sync link ${link.id} to Neo4j after ${maxRetries} retries`,
+            error,
+          );
+          
+          // Log sync failure for reconciliation
+          await this.logSyncFailure('link', link.id, error.message);
+          
+          throw new Error(`Neo4j sync failed for link ${link.id}: ${error.message}`);
+        }
+        
+        // Exponential backoff
+        const backoffMs = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+        this.logger.warn(
+          `Neo4j sync failed for link ${link.id} (attempt ${retryCount}/${maxRetries}). Retrying in ${backoffMs}ms...`,
+        );
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
+    }
   }
 
-  async getContextGroup(recordId: string, depth: number = 2) {
+  private async logSyncFailure(entityType: string, entityId: string, error: string) {
+    try {
+      // Create a sync failure log entry in PostgreSQL for reconciliation
+      await this.prisma.activityLog.create({
+        data: {
+          action: 'NEO4J_SYNC_FAILURE',
+          resource: `${entityType}/${entityId}`,
+          payload: {
+            entityType,
+            entityId,
+            error,
+            timestamp: new Date().toISOString(),
+          },
+        },
+      });
+    } catch (logError) {
+      this.logger.error(`Failed to log sync failure for ${entityType} ${entityId}`, logError);
+    }
+  }
+
+  async getContextGroup(recordId: string, userId: string, depth: number = 2) {
     const cypher = `
       MATCH (start:Artifact {id: $id})
+      WHERE start.userId = $userId
       CALL apoc.path.subgraphAll(start, {
         maxLevel: $depth,
-        relationshipFilter: 'RELATED_TO'
+        relationshipFilter: 'RELATED_TO',
+        labelFilter: '+Artifact',
+        filterStartNode: true
       })
       YIELD nodes, relationships
+      WITH nodes, relationships
+      WHERE all(n IN nodes WHERE n.userId = $userId)
       RETURN nodes, relationships
     `;
 
-    const result = await this.neo4jService.run(cypher, { id: recordId, depth });
+    const result = await this.neo4jService.run(cypher, { id: recordId, userId, depth });
     return result[0];
   }
 
-  async createContextGroup(recordAId: string, recordBId: string, title: string) {
+  async createContextGroup(recordAId: string, recordBId: string, userId: string, title: string) {
     const groupId = crypto.randomUUID();
     const cypher = `
       MERGE (g:ContextGroup {id: $groupId})
@@ -82,15 +173,18 @@ export class GraphService {
           g.updatedAt = datetime(),
           g.coherenceScore = 1.0,
           g.topics = [],
-          g.status = 'active'
+          g.status = 'active',
+          g.userId = $userId
       WITH g
       MATCH (a:Artifact {id: $recordAId})
+      WHERE a.userId = $userId
       MATCH (b:Artifact {id: $recordBId})
+      WHERE b.userId = $userId
       MERGE (a)-[:BELONGS_TO {weight: 1.0}]->(g)
       MERGE (b)-[:BELONGS_TO {weight: 1.0}]->(g)
       RETURN g
     `;
-    await this.neo4jService.run(cypher, { groupId, title, recordAId, recordBId });
+    await this.neo4jService.run(cypher, { groupId, title, recordAId, recordBId, userId });
     
     // Calculate initial topics and coherence
     await this.updateGroupMetadata(groupId);
@@ -205,11 +299,15 @@ export class GraphService {
     await this.checkAndSplitGroup(groupId);
   }
 
-  async mergeContextGroups(targetGroupId: string, sourceGroupId: string) {
+  async mergeContextGroups(targetGroupId: string, sourceGroupId: string, userId: string) {
     // Move all members of source group to target group
     const cypher = `
-      MATCH (source:ContextGroup {id: $sourceGroupId})<-[r:BELONGS_TO]-(a:Artifact)
+      MATCH (source:ContextGroup {id: $sourceGroupId})
+      WHERE source.userId = $userId
       MATCH (target:ContextGroup {id: $targetGroupId})
+      WHERE target.userId = $userId
+      MATCH (source)<-[r:BELONGS_TO]-(a:Artifact)
+      WHERE a.userId = $userId
       MERGE (a)-[newR:BELONGS_TO]->(target)
       SET newR.weight = coalesce(r.weight, 1.0)
       SET target.updatedAt = datetime()
@@ -217,7 +315,7 @@ export class GraphService {
       WITH source
       DETACH DELETE source
     `;
-    await this.neo4jService.run(cypher, { targetGroupId, sourceGroupId });
+    await this.neo4jService.run(cypher, { targetGroupId, sourceGroupId, userId });
     
     // Recalculate metadata for merged group
     await this.updateGroupMetadata(targetGroupId);
@@ -375,32 +473,37 @@ export class GraphService {
     return result.map(r => r.get('id'));
   }
 
-  async deleteContextGroup(groupId: string) {
+  async deleteContextGroup(groupId: string, userId: string) {
     const cypher = `
       MATCH (g:ContextGroup {id: $groupId})
+      WHERE g.userId = $userId
       DETACH DELETE g
     `;
-    await this.neo4jService.run(cypher, { groupId });
+    await this.neo4jService.run(cypher, { groupId, userId });
     this.logger.log(`Deleted context group ${groupId}`);
   }
 
-  async renameContextGroup(groupId: string, newName: string) {
+  async renameContextGroup(groupId: string, newName: string, userId: string) {
     const cypher = `
       MATCH (g:ContextGroup {id: $groupId})
+      WHERE g.userId = $userId
       SET g.name = $newName, g.updatedAt = datetime()
       RETURN g
     `;
-    await this.neo4jService.run(cypher, { groupId, newName });
+    await this.neo4jService.run(cypher, { groupId, newName, userId });
     this.logger.log(`Renamed context group ${groupId} to "${newName}"`);
   }
 
-  async removeFromContextGroup(groupId: string, recordId: string) {
+  async removeFromContextGroup(groupId: string, recordId: string, userId: string) {
     const cypher = `
-      MATCH (a:Artifact {id: $recordId})-[r:BELONGS_TO]->(g:ContextGroup {id: $groupId})
+      MATCH (g:ContextGroup {id: $groupId})
+      WHERE g.userId = $userId
+      MATCH (a:Artifact {id: $recordId})-[r:BELONGS_TO]->(g)
+      WHERE a.userId = $userId
       DELETE r
       SET g.updatedAt = datetime()
     `;
-    await this.neo4jService.run(cypher, { groupId, recordId });
+    await this.neo4jService.run(cypher, { groupId, recordId, userId });
     
     // Update group metadata after removal
     await this.updateGroupMetadata(groupId);
@@ -408,10 +511,11 @@ export class GraphService {
     // Delete group if empty
     const deleteEmptyCypher = `
       MATCH (g:ContextGroup {id: $groupId})
+      WHERE g.userId = $userId
       WHERE NOT EXISTS { MATCH (g)<-[:BELONGS_TO]-() }
       DETACH DELETE g
     `;
-    await this.neo4jService.run(deleteEmptyCypher, { groupId });
+    await this.neo4jService.run(deleteEmptyCypher, { groupId, userId });
     
     this.logger.log(`Removed artifact ${recordId} from group ${groupId}`);
   }
@@ -497,6 +601,51 @@ export class GraphService {
     });
   }
 
+  /**
+   * Hybrid fetch approach: Get candidate IDs from Neo4j, then hydrate with full records from PostgreSQL
+   * This ensures embeddings are available for ML scoring
+   */
+  async findLinkingCandidateIds(recordId: string, userId: string, maxCandidates: number = 100): Promise<string[]> {
+    const cypher = `
+      MATCH (target:Artifact {id: $recordId})
+      MATCH (candidate:Artifact)
+      WHERE candidate.userId = $userId
+        AND candidate.id <> $recordId
+        AND duration.between(datetime(candidate.timestamp), datetime()).days <= 30
+        AND NOT EXISTS {
+          MATCH (target)-[:RELATED_TO]-(candidate)
+        }
+      RETURN candidate.id as id
+      ORDER BY datetime(candidate.timestamp) DESC
+      LIMIT $maxCandidates
+    `;
+    
+    const result = await this.neo4jService.run(cypher, { 
+      recordId, 
+      userId,
+      maxCandidates: neo4j.int(maxCandidates)
+    });
+
+    return result.map(r => r.get('id'));
+  }
+
+  /**
+   * Hydrate full UnifiedRecord objects from PostgreSQL by IDs
+   * Includes embeddings and all other fields needed for ML scoring
+   */
+  async hydrateRecordsFromIds(ids: string[]): Promise<UnifiedRecord[]> {
+    if (ids.length === 0) return [];
+
+    return this.prisma.unifiedRecord.findMany({
+      where: {
+        id: { in: ids }
+      },
+      orderBy: {
+        timestamp: 'desc'
+      }
+    });
+  }
+
   async calculateGraphSignals(recordAId: string, recordBId: string): Promise<{
     hasIdMatch: boolean;
     hasUrlReference: boolean;
@@ -553,16 +702,98 @@ export class GraphService {
     };
   }
 
-  async deleteArtifact(externalIdOrId: string) {
+  async deleteArtifact(externalIdOrId: string, userId: string) {
     // Delete artifact and all its relationships (both incoming and outgoing)
     const cypher = `
       MATCH (a:Artifact)
-      WHERE a.id = $identifier OR a.externalId = $identifier
+      WHERE (a.id = $identifier OR a.externalId = $identifier)
+        AND a.userId = $userId
       DETACH DELETE a
     `;
     
-    await this.neo4jService.run(cypher, { identifier: externalIdOrId });
+    await this.neo4jService.run(cypher, { identifier: externalIdOrId, userId });
     this.logger.log(`Deleted artifact ${externalIdOrId} from Neo4j`);
   }
+
+  /**
+   * Reconciliation job to fix PostgreSQL-Neo4j sync inconsistencies
+   * Should be run periodically (e.g., daily) or triggered by monitoring alerts
+   */
+  async reconcileSyncFailures(limit: number = 100): Promise<number> {
+    this.logger.log('Starting Neo4j sync reconciliation...');
+    
+    // Get failed sync operations from activity logs
+    const failures = await this.prisma.activityLog.findMany({
+      where: {
+        action: 'NEO4J_SYNC_FAILURE',
+        createdAt: {
+          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: limit,
+    });
+
+    if (failures.length === 0) {
+      this.logger.log('No sync failures found to reconcile');
+      return 0;
+    }
+
+    this.logger.log(`Found ${failures.length} sync failures to reconcile`);
+    let reconciledCount = 0;
+
+    for (const failure of failures) {
+      const payload = failure.payload as any;
+      const entityType = payload.entityType;
+      const entityId = payload.entityId;
+
+      try {
+        if (entityType === 'record') {
+          // Re-sync the record
+          const record = await this.prisma.unifiedRecord.findUnique({
+            where: { id: entityId },
+          });
+
+          if (record) {
+            await this.syncRecord(record);
+            reconciledCount++;
+            this.logger.log(`Reconciled record ${entityId}`);
+          } else {
+            this.logger.warn(`Record ${entityId} not found in PostgreSQL, skipping`);
+          }
+        } else if (entityType === 'link') {
+          // Re-sync the link
+          const link = await this.prisma.link.findUnique({
+            where: { id: entityId },
+          });
+
+          if (link) {
+            await this.syncLink(link);
+            reconciledCount++;
+            this.logger.log(`Reconciled link ${entityId}`);
+          } else {
+            this.logger.warn(`Link ${entityId} not found in PostgreSQL, skipping`);
+          }
+        }
+
+        // Mark as reconciled by deleting the failure log
+        await this.prisma.activityLog.delete({
+          where: { id: failure.id },
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to reconcile ${entityType} ${entityId}`,
+          error,
+        );
+        // Leave the failure log for next reconciliation attempt
+      }
+    }
+
+    this.logger.log(`Reconciliation complete. Reconciled ${reconciledCount}/${failures.length} entities`);
+    return reconciledCount;
+  }
 }
+
 

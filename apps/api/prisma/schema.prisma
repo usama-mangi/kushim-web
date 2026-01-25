@@ -41,6 +41,7 @@ model DataSource {
   credentialsEncrypted Json     @map("credentials_encrypted")
   status               String   @default("active")
   lastSync             DateTime? @map("last_sync")
+  metadata             Json?    @map("metadata")
   createdAt            DateTime @default(now()) @map("created_at")
 
   user                 User            @relation(fields: [userId], references: [id])

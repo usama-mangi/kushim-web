@@ -126,11 +126,20 @@ export class OAuthService {
     if (!clientId) throw new Error('SLACK_CLIENT_ID not configured');
     
     const redirectUri = process.env.SLACK_CALLBACK_URL || 'http://localhost:3001/api/ingestion/oauth/slack/callback';
-    const scopes = ['channels:read', 'channels:history', 'chat:write', 'files:read', 'stars:read'];
+    
+    // Slack OAuth v2 requires user_scope for user-level permissions
+    // These are the scopes needed to read user's messages, files, etc.
+    const userScopes = [
+      'channels:history',
+      'channels:read',
+      'files:read',
+      'search:read',
+      'users:read',
+    ];
 
     const params = new URLSearchParams({
         client_id: clientId,
-        scope: scopes.join(','), // Slack uses comma separator
+        user_scope: userScopes.join(','),
         redirect_uri: redirectUri,
         state: state
     });
@@ -189,7 +198,14 @@ export class OAuthService {
         throw new Error('Failed to exchange Google token');
     }
 
-    return await response.json();
+    const tokenData = await response.json();
+    
+    return {
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_at: Date.now() + (tokenData.expires_in * 1000),
+      token_type: tokenData.token_type,
+    };
   }
 
   private async exchangeGithubToken(code: string): Promise<any> {
@@ -218,7 +234,12 @@ export class OAuthService {
     const data = await response.json();
     if (data.error) throw new Error(data.error_description || 'GitHub OAuth Error');
     
-    return { token: data.access_token };
+    return { 
+      token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: data.expires_in ? Date.now() + (data.expires_in * 1000) : null,
+      token_type: data.token_type,
+    };
   }
 
   private async exchangeJiraToken(code: string): Promise<any> {
@@ -271,6 +292,7 @@ export class OAuthService {
     return {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
+      expires_at: Date.now() + (tokenData.expires_in * 1000),
       host: `https://api.atlassian.com/ex/jira/${site.id}`,
       cloudId: site.id,
       siteName: site.name,
@@ -302,6 +324,130 @@ export class OAuthService {
       throw new Error(data.error || 'Slack OAuth Error');
     }
 
-    return { token: data.access_token, team: data.team, authed_user: data.authed_user };
+    // Slack OAuth v2 returns both bot and user tokens
+    // For user_scope permissions, we need the user token
+    // Note: Slack tokens don't expire, so no expires_at needed
+    return { 
+      token: data.authed_user?.access_token || data.access_token,
+      team: data.team,
+      authed_user: data.authed_user,
+      bot_token: data.access_token, // Bot token (if bot scopes were requested)
+    };
+  }
+
+  /**
+   * Refresh OAuth access token for providers that support it
+   */
+  async refreshAccessToken(provider: string, refreshToken: string): Promise<any> {
+    switch (provider) {
+      case 'jira':
+        return this.refreshJiraToken(refreshToken);
+      case 'google':
+        return this.refreshGoogleToken(refreshToken);
+      case 'github':
+        return this.refreshGithubToken(refreshToken);
+      default:
+        throw new BadRequestException(`Token refresh not supported for ${provider}`);
+    }
+  }
+
+  private async refreshGithubToken(refreshToken: string): Promise<any> {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) throw new Error('GitHub credentials not configured');
+
+    const response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      this.logger.error(`GitHub Token Refresh Error: ${err}`);
+      throw new Error('Failed to refresh GitHub token');
+    }
+
+    const tokenData = await response.json();
+    if (tokenData.error) {
+      throw new Error(tokenData.error_description || 'GitHub token refresh failed');
+    }
+
+    return {
+      token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || refreshToken,
+      expires_at: tokenData.expires_in ? Date.now() + (tokenData.expires_in * 1000) : null,
+    };
+  }
+
+  private async refreshJiraToken(refreshToken: string): Promise<any> {
+    const clientId = process.env.JIRA_CLIENT_ID;
+    const clientSecret = process.env.JIRA_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) throw new Error('Jira credentials not configured');
+
+    const response = await fetch('https://auth.atlassian.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'refresh_token',
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      this.logger.error(`Jira Token Refresh Error: ${err}`);
+      throw new Error('Failed to refresh Jira token');
+    }
+
+    const tokenData = await response.json();
+    return {
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token || refreshToken,
+      expires_at: Date.now() + (tokenData.expires_in * 1000),
+    };
+  }
+
+  private async refreshGoogleToken(refreshToken: string): Promise<any> {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) throw new Error('Google credentials not configured');
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      this.logger.error(`Google Token Refresh Error: ${err}`);
+      throw new Error('Failed to refresh Google token');
+    }
+
+    const tokenData = await response.json();
+    return {
+      access_token: tokenData.access_token,
+      refresh_token: refreshToken, // Google may not return a new refresh token
+      expires_at: Date.now() + (tokenData.expires_in * 1000),
+    };
   }
 }
