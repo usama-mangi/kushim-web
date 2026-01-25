@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Neo4jService } from '../neo4j/neo4j.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UnifiedRecord, Link } from '@prisma/client';
+import { RedisService } from '../common/redis.service';
 import neo4j from 'neo4j-driver';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class GraphService {
   constructor(
     private neo4jService: Neo4jService,
     private prisma: PrismaService,
+    private redisService: RedisService,
   ) {}
 
   async syncRecord(record: UnifiedRecord) {
@@ -145,6 +147,14 @@ export class GraphService {
   }
 
   async getContextGroup(recordId: string, userId: string, depth: number = 2) {
+    // Try cache first
+    const cacheKey = `${recordId}:${depth}`;
+    const cached = await this.redisService.getCachedContextGroup(userId, cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit for context group: ${cacheKey}`);
+      return cached;
+    }
+
     const cypher = `
       MATCH (start:Artifact {id: $id})
       WHERE start.userId = $userId
@@ -161,7 +171,12 @@ export class GraphService {
     `;
 
     const result = await this.neo4jService.run(cypher, { id: recordId, userId, depth });
-    return result[0];
+    const data = result[0];
+
+    // Cache the result
+    await this.redisService.cacheContextGroup(userId, cacheKey, data);
+    
+    return data;
   }
 
   async createContextGroup(recordAId: string, recordBId: string, userId: string, title: string) {
@@ -188,6 +203,9 @@ export class GraphService {
     
     // Calculate initial topics and coherence
     await this.updateGroupMetadata(groupId);
+    
+    // Invalidate cache for affected records
+    await this.redisService.invalidateUserContextGroups(userId);
     
     return groupId;
   }

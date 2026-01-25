@@ -6,9 +6,16 @@ import { LinksController } from './links.controller';
 import { RelationshipService } from './relationship.service';
 import { MLScoringService } from './ml-scoring.service';
 import { GraphService } from './graph.service';
+import { RedisService } from '../common/redis.service';
 
 @Module({
-  providers: [RecordsService, RelationshipService, MLScoringService, GraphService],
+  providers: [
+    RecordsService,
+    RelationshipService,
+    MLScoringService,
+    GraphService,
+    RedisService,
+  ],
   controllers: [RecordsController, GraphController, LinksController],
   exports: [RecordsService, RelationshipService, MLScoringService, GraphService],
 })

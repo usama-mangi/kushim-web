@@ -4,6 +4,7 @@ import { UnifiedRecord } from '@prisma/client';
 import { MLScoringService } from './ml-scoring.service';
 import { GraphService } from './graph.service';
 import { TfIdfService } from '../common/tfidf.service';
+import { RedisService } from '../common/redis.service';
 
 @Injectable()
 export class RelationshipService {
@@ -20,6 +21,7 @@ export class RelationshipService {
     private mlScoringService: MLScoringService,
     private graphService: GraphService,
     private tfidfService: TfIdfService,
+    private redisService: RedisService,
   ) {
     // ML_SHADOW_MODE: true = log ML predictions but don't create links
     // ML_SHADOW_MODE: false = create links based on ML predictions
@@ -36,17 +38,23 @@ export class RelationshipService {
   }
 
   async discoverRelationships(newRecord: UnifiedRecord) {
-    // Wrap in transaction to prevent race conditions
-    return await this.prisma.$transaction(async (tx) => {
-      // Hybrid fetch: Use Neo4j for fast graph-based candidate discovery (IDs only),
-      // then hydrate with full records from PostgreSQL (includes embeddings)
-      const candidateIds = await this.graphService.findLinkingCandidateIds(
-        newRecord.id,
-        newRecord.userId,
-        100
-      );
+    // Acquire distributed lock to prevent duplicate link creation across instances
+    const lockResource = `relationship_discovery:${newRecord.id}`;
+    
+    return await this.redisService.withLock(
+      lockResource,
+      async () => {
+        // Wrap in transaction to prevent race conditions
+        return await this.prisma.$transaction(async (tx) => {
+          // Hybrid fetch: Use Neo4j for fast graph-based candidate discovery (IDs only),
+          // then hydrate with full records from PostgreSQL (includes embeddings)
+          const candidateIds = await this.graphService.findLinkingCandidateIds(
+            newRecord.id,
+            newRecord.userId,
+            100
+          );
 
-      const candidates = await this.graphService.hydrateRecordsFromIds(candidateIds);
+          const candidates = await this.graphService.hydrateRecordsFromIds(candidateIds);
 
       for (const candidate of candidates) {
         const deterministicScore = await this.calculateLinkScoreOptimized(newRecord, candidate);
@@ -173,6 +181,9 @@ export class RelationshipService {
       maxWait: 5000, // Maximum wait time in ms
       timeout: 30000, // Maximum transaction time in ms
     });
+      },
+      15000, // Lock TTL: 15 seconds (longer than transaction timeout)
+    );
   }
 
   private async calculateLinkScoreOptimized(a: UnifiedRecord, b: any): Promise<number> {
