@@ -2,6 +2,7 @@ import { BaseAdapter } from './base.adapter';
 import { createHash } from 'crypto';
 import { Octokit } from 'octokit';
 import { KushimStandardRecord, ArtifactType } from '../../common/ksr.interface';
+import { GitHubCredentials, isGitHubCredentials } from '../../common/oauth-credentials.types';
 import { v4 as uuidv4 } from 'uuid';
 
 export class GithubAdapter extends BaseAdapter {
@@ -11,11 +12,9 @@ export class GithubAdapter extends BaseAdapter {
     super();
   }
 
-  async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
-    if (!credentials?.token) {
-      throw new Error(
-        'GitHub Personal Access Token is required in credentials',
-      );
+  async fetch(credentials: GitHubCredentials, lastSync?: Date): Promise<any[]> {
+    if (!isGitHubCredentials(credentials)) {
+      throw new Error('Invalid GitHub credentials format');
     }
 
     const octokit = new Octokit({ auth: credentials.token });

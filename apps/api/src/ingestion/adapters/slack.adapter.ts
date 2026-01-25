@@ -2,6 +2,7 @@ import { BaseAdapter } from './base.adapter';
 import { createHash } from 'crypto';
 import { WebClient } from '@slack/web-api';
 import { KushimStandardRecord, ArtifactType } from '../../common/ksr.interface';
+import { SlackCredentials, isSlackCredentials } from '../../common/oauth-credentials.types';
 import { v4 as uuidv4 } from 'uuid';
 
 export class SlackAdapter extends BaseAdapter {
@@ -11,9 +12,9 @@ export class SlackAdapter extends BaseAdapter {
     super();
   }
 
-  async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
-    if (!credentials?.token) {
-      throw new Error('Slack User Token is required');
+  async fetch(credentials: SlackCredentials, lastSync?: Date): Promise<any[]> {
+    if (!isSlackCredentials(credentials)) {
+      throw new Error('Invalid Slack credentials format');
     }
 
     const client = new WebClient(credentials.token);

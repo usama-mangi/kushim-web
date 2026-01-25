@@ -2,6 +2,7 @@ import { BaseAdapter } from './base.adapter';
 import { createHash } from 'crypto';
 import { Version3Client } from 'jira.js';
 import { KushimStandardRecord, ArtifactType } from '../../common/ksr.interface';
+import { JiraCredentials, isJiraCredentials } from '../../common/oauth-credentials.types';
 import { v4 as uuidv4 } from 'uuid';
 
 export class JiraAdapter extends BaseAdapter {
@@ -11,14 +12,14 @@ export class JiraAdapter extends BaseAdapter {
     super();
   }
 
-  async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
-    if (!credentials?.host && !credentials?.cloudId) {
-       // OAuth flow might return cloudId or we might need to fetch resources accessible
+  async fetch(credentials: JiraCredentials, lastSync?: Date): Promise<any[]> {
+    if (!isJiraCredentials(credentials)) {
+      throw new Error('Invalid Jira credentials format');
     }
 
     const token = credentials.accessToken;
-    const email = credentials.email;
-    const apiToken = credentials.apiToken;
+    const email = (credentials as any).email; // For basic auth fallback
+    const apiToken = (credentials as any).apiToken; // For basic auth fallback
 
     if (!credentials.host) {
         throw new Error('Jira Host is required');

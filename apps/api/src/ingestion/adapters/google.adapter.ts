@@ -2,6 +2,7 @@ import { BaseAdapter } from './base.adapter';
 import { createHash } from 'crypto';
 import { google } from 'googleapis';
 import { KushimStandardRecord, ArtifactType } from '../../common/ksr.interface';
+import { GoogleCredentials, isGoogleCredentials } from '../../common/oauth-credentials.types';
 import { v4 as uuidv4 } from 'uuid';
 
 export class GoogleAdapter extends BaseAdapter {
@@ -11,9 +12,9 @@ export class GoogleAdapter extends BaseAdapter {
     super();
   }
 
-  async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
-    if (!credentials?.refresh_token && !credentials?.access_token) {
-      throw new Error('Google credentials (access_token or refresh_token) required');
+  async fetch(credentials: GoogleCredentials, lastSync?: Date): Promise<any[]> {
+    if (!isGoogleCredentials(credentials)) {
+      throw new Error('Invalid Google credentials format');
     }
 
     const auth = new google.auth.OAuth2(

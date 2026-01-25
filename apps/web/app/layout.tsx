@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from 'sonner';
 import Providers from "./providers";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const metadata: Metadata = {
   title: "Kushim Dashboard",
@@ -27,8 +28,10 @@ export default function RootLayout({
           Skip to search
         </a>
         
-        <Providers>{children}</Providers>
-        <Toaster position="top-right" richColors />
+        <ErrorBoundary>
+          <Providers>{children}</Providers>
+          <Toaster position="top-right" richColors />
+        </ErrorBoundary>
       </body>
     </html>
   );
