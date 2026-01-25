@@ -7,6 +7,10 @@ import { v4 as uuidv4 } from 'uuid';
 export class GoogleAdapter extends BaseAdapter {
   name = 'google';
 
+  constructor() {
+    super();
+  }
+
   async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
     if (!credentials?.refresh_token && !credentials?.access_token) {
       throw new Error('Google credentials (access_token or refresh_token) required');
@@ -44,7 +48,7 @@ export class GoogleAdapter extends BaseAdapter {
         results.push(...driveRes.data.files.map(f => ({ ...f, _type: 'drive' })));
       }
     } catch (e) {
-      console.error('Google Drive Fetch Error:', e);
+      this.logger.error('Google Drive Fetch Error', e);
     }
 
     // 2. Fetch Gmail (Emails)
@@ -75,7 +79,7 @@ export class GoogleAdapter extends BaseAdapter {
         }
       }
     } catch (e) {
-      console.error('Gmail Fetch Error:', e);
+      this.logger.error('Gmail Fetch Error', e);
     }
 
     return results;

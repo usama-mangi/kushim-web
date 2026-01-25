@@ -7,6 +7,10 @@ import { v4 as uuidv4 } from 'uuid';
 export class JiraAdapter extends BaseAdapter {
   name = 'jira';
 
+  constructor() {
+    super();
+  }
+
   async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
     if (!credentials?.host && !credentials?.cloudId) {
        // OAuth flow might return cloudId or we might need to fetch resources accessible
@@ -52,7 +56,7 @@ export class JiraAdapter extends BaseAdapter {
         throw new Error('No valid credentials provided');
       }
 
-      console.log(`Fetching Jira: ${searchUrl} with JQL: ${jql}`);
+      this.logger.debug(`Fetching Jira: ${searchUrl} with JQL: ${jql}`);
 
       const response = await fetch(searchUrl, {
         method: 'POST', // Use POST for search to avoid query string length limits and encoding issues
@@ -77,7 +81,7 @@ export class JiraAdapter extends BaseAdapter {
 
       if (!response.ok) {
         const errText = await response.text();
-        console.error(`Jira API Error ${response.status}: ${errText}`);
+        this.logger.error(`Jira API Error ${response.status}: ${errText}`);
         const error = new Error(`Jira API Request failed: ${response.status} ${response.statusText}`);
         (error as any).statusCode = response.status; // Preserve status code
         throw error;
@@ -87,7 +91,7 @@ export class JiraAdapter extends BaseAdapter {
       return data.issues || [];
 
     } catch (error) {
-      console.error('Jira API Error:', error);
+      this.logger.error('Jira API Error', error);
       // Re-throw original error to preserve status code information
       throw error;
     }

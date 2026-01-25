@@ -8,6 +8,7 @@ import {
   Delete,
   Body,
   Request,
+  Logger,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -21,6 +22,8 @@ import { GraphService } from '../records/graph.service';
 
 @Controller('ingestion')
 export class IngestionController {
+  private readonly logger = new Logger(IngestionController.name);
+
   constructor(
     @InjectQueue('ingestion') private ingestionQueue: Queue,
     private prisma: PrismaService,
@@ -71,11 +74,11 @@ export class IngestionController {
       try {
         for (const record of records) {
           // Delete artifact node and all its relationships in Neo4j
-          await this.graphService.deleteArtifact(record.externalId);
+          await this.graphService.deleteArtifact(record.externalId, req.user.userId);
         }
       } catch (error) {
         // Log but don't fail the deletion if Neo4j cleanup fails
-        console.error('Neo4j cleanup failed:', error);
+        this.logger.error('Neo4j cleanup failed', error);
       }
     }
 

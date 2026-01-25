@@ -21,4 +21,5 @@ export interface KushimStandardRecord {
   participants: string[]; // List of users involved
   metadata: Record<string, any>; // Platform-specific fields
   checksum: string; // For deduplication
+  embedding?: number[]; // Optional embedding vector for semantic similarity
 }

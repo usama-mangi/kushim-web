@@ -7,6 +7,10 @@ import { v4 as uuidv4 } from 'uuid';
 export class GithubAdapter extends BaseAdapter {
   name = 'github';
 
+  constructor() {
+    super();
+  }
+
   async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
     if (!credentials?.token) {
       throw new Error(
@@ -25,7 +29,7 @@ export class GithubAdapter extends BaseAdapter {
       });
       return data;
     } catch (error) {
-      console.error('GitHub API Error:', error);
+      this.logger.error('GitHub API Error', error);
       throw new Error('Failed to fetch data from GitHub');
     }
   }

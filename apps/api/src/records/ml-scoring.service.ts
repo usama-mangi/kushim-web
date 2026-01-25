@@ -116,20 +116,21 @@ export class MLScoringService {
     }
   }
 
-  private parseEmbedding(embedding: any): number[] | null {
+  private parseEmbedding(embedding: unknown): number[] | null {
     if (!embedding) return null;
 
     // Handle JSON stored embedding
     if (typeof embedding === 'string') {
       try {
-        return JSON.parse(embedding);
+        const parsed = JSON.parse(embedding);
+        return Array.isArray(parsed) && parsed.every(n => typeof n === 'number') ? parsed : null;
       } catch {
         return null;
       }
     }
 
     // Already an array
-    if (Array.isArray(embedding)) {
+    if (Array.isArray(embedding) && embedding.every(n => typeof n === 'number')) {
       return embedding;
     }
 

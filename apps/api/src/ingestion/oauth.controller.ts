@@ -6,7 +6,8 @@ import {
   UseGuards, 
   Request, 
   Res,
-  BadRequestException
+  BadRequestException,
+  Logger
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -14,6 +15,8 @@ import { OAuthService } from './oauth.service';
 
 @Controller('ingestion/oauth')
 export class OAuthController {
+  private readonly logger = new Logger(OAuthController.name);
+
   constructor(private oauthService: OAuthService) {}
 
   @UseGuards(JwtAuthGuard)
@@ -48,7 +51,7 @@ export class OAuthController {
       await this.oauthService.handleCallback(provider, code, state);
       return res.redirect(`${frontendUrl}/sources?success=true&provider=${provider}`);
     } catch (err: any) {
-      console.error('OAuth Callback Error:', err);
+      this.logger.error(`OAuth Callback Error for ${provider}`, err.stack || err);
       return res.redirect(`${frontendUrl}/sources?error=${encodeURIComponent(err.message || 'Unknown error')}`);
     }
   }

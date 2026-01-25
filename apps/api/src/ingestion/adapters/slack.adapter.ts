@@ -7,6 +7,10 @@ import { v4 as uuidv4 } from 'uuid';
 export class SlackAdapter extends BaseAdapter {
   name = 'slack';
 
+  constructor() {
+    super();
+  }
+
   async fetch(credentials: any, lastSync?: Date): Promise<any[]> {
     if (!credentials?.token) {
       throw new Error('Slack User Token is required');
@@ -31,7 +35,7 @@ export class SlackAdapter extends BaseAdapter {
 
       return items;
     } catch (error) {
-      console.error('Slack API Error:', error);
+      this.logger.error('Slack API Error', error);
       throw new Error('Failed to fetch data from Slack');
     }
   }

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
@@ -8,6 +8,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
@@ -154,7 +156,7 @@ export class AuthService {
 
     // In a real app, generate a reset token and send email.
     // For now, we'll log it.
-    console.log(`Password reset requested for ${email}`);
+    this.logger.log(`Password reset requested for ${email}`);
     return { message: 'If an account exists, a reset link has been sent' };
   }
 }
