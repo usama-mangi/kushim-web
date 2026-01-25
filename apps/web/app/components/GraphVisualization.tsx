@@ -80,21 +80,7 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
     setSelectedNode(null); // Close node panel if open
   }, []);
 
-  const getNodeColor = (node: GraphNode) => {
-    if (node.type === 'group') return '#6366f1'; // indigo-500
-    
-    // Color by source platform
-    const platform = node.metadata?.platform || node.metadata?.source;
-    switch (platform?.toLowerCase()) {
-      case 'github': return '#f97316'; // orange-500
-      case 'jira': return '#0ea5e9'; // sky-500
-      case 'slack': return '#a855f7'; // purple-500
-      case 'google': return '#10b981'; // emerald-500
-      default: return '#64748b'; // slate-500
-    }
-  };
-
-  const getNodeSize = (node: GraphNode) => {
+  const getNodeSize = useCallback((node: GraphNode) => {
     if (node.type === 'group') return 8;
     
     // Size based on connections
@@ -105,19 +91,71 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
     ).length;
     
     return Math.max(4, Math.min(12, 4 + connections));
-  };
+  }, [data.links]);
 
-  const getLinkColor = (link: GraphLink) => {
+  const getNodeColor = useCallback((node: GraphNode) => {
+    if (node.type === 'group') return '#6366f1'; // indigo-500
+    
+    // Color by source platform
+    const platform = node.metadata?.platform || node.metadata?.source;
+    switch (platform?.toLowerCase()) {
+      case 'github': return '#f97316'; // orange-500
+      case 'jira': return '#0ea5e9'; // sky-500
+      case 'slack': return '#a855f7'; // purple-500
+      case 'google': return '#eab308'; // yellow-500
+      default: return '#64748b'; // slate-500
+    }
+  }, []);
+
+  const getLinkColor = useCallback((link: GraphLink) => {
     const confidence = link.confidence || 0;
     if (confidence > 0.7) return 'rgba(34, 197, 94, 0.6)'; // green
     if (confidence > 0.4) return 'rgba(251, 191, 36, 0.6)'; // yellow
     return 'rgba(148, 163, 184, 0.4)'; // slate
-  };
+  }, []);
 
-  const getLinkWidth = (link: GraphLink) => {
+  const getLinkWidth = useCallback((link: GraphLink) => {
     const confidence = link.confidence || 0;
     return Math.max(1, confidence * 3);
-  };
+  }, []);
+
+  const nodeCanvasObjectCallback = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+    const typedNode = node as GraphNode;
+    const label = typedNode.label;
+    const fontSize = 12 / globalScale;
+    const nodeSize = getNodeSize(typedNode);
+
+    // Draw node circle
+    ctx.beginPath();
+    ctx.arc(node.x!, node.y!, nodeSize, 0, 2 * Math.PI, false);
+    ctx.fillStyle = getNodeColor(typedNode);
+    ctx.fill();
+
+    // Draw border for selected node
+    if (selectedNode?.id === typedNode.id) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2 / globalScale;
+      ctx.stroke();
+    }
+
+    // Draw label
+    if (globalScale > 1.5) {
+      ctx.font = `${fontSize}px Sans-Serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillText(label, node.x!, node.y! + nodeSize + fontSize);
+    }
+  }, [selectedNode, getNodeSize, getNodeColor]);
+
+  const nodePointerAreaPaintCallback = useCallback((node: any, color: string, ctx: CanvasRenderingContext2D) => {
+    const typedNode = node as GraphNode;
+    const nodeSize = getNodeSize(typedNode);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(node.x!, node.y!, nodeSize, 0, 2 * Math.PI, false);
+    ctx.fill();
+  }, [getNodeSize]);
 
   return (
     <div className="relative w-full h-full">
@@ -132,36 +170,9 @@ export default function GraphVisualization({ data }: GraphVisualizationProps) {
           width={dimensions.width}
           height={dimensions.height}
           nodeLabel={(node) => (node as GraphNode).label}
+          nodeCanvasObject={nodeCanvasObjectCallback}
+          nodePointerAreaPaint={nodePointerAreaPaintCallback}
           nodeColor={(node) => getNodeColor(node as GraphNode)}
-          nodeVal={(node) => getNodeSize(node as GraphNode)}
-          nodeCanvasObject={(node, ctx, globalScale) => {
-            const typedNode = node as GraphNode;
-            const label = typedNode.label;
-            const fontSize = 12 / globalScale;
-            const nodeSize = getNodeSize(typedNode);
-
-            // Draw node circle
-            ctx.beginPath();
-            ctx.arc(node.x!, node.y!, nodeSize, 0, 2 * Math.PI, false);
-            ctx.fillStyle = getNodeColor(typedNode);
-            ctx.fill();
-
-            // Draw border for selected node
-            if (selectedNode?.id === typedNode.id) {
-              ctx.strokeStyle = '#ffffff';
-              ctx.lineWidth = 2 / globalScale;
-              ctx.stroke();
-            }
-
-            // Draw label
-            if (globalScale > 1.5) {
-              ctx.font = `${fontSize}px Sans-Serif`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillStyle = '#e2e8f0';
-              ctx.fillText(label, node.x!, node.y! + nodeSize + fontSize);
-            }
-          }}
           linkColor={(link) => getLinkColor(link as GraphLink)}
           linkWidth={(link) => getLinkWidth(link as GraphLink)}
           linkDirectionalParticles={2}

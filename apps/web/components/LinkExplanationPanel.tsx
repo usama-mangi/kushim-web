@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ThumbsUp, ThumbsDown, Check, X, Sparkles, Link2, Brain, TrendingUp } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Check, X, Sparkles, Link2, Brain, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
 import axios from 'axios';
 
 interface LinkExplanation {
@@ -44,6 +44,7 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
   const [explanation, setExplanation] = useState<LinkExplanation | null>(null);
   const [loading, setLoading] = useState(true);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   useState(() => {
     fetchExplanation();
@@ -108,6 +109,9 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
 
   const isMLAssisted = explanation.discoveryMethod === 'ml_assisted';
   const scorePercent = Math.round(explanation.confidenceScore * 100);
+
+  // Get primary score to show (simplified view)
+  const primaryScore = explanation.explanation.mlScore || explanation.explanation.deterministicScore || explanation.confidenceScore;
 
   return (
     <div 
@@ -183,80 +187,115 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
           </div>
         )}
 
-        {/* Score Breakdown */}
+        {/* Simplified Score Display */}
         <div className="space-y-3">
-          <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">Score Breakdown</div>
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300">Match Strength</div>
+            <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400" aria-label={`${Math.round(primaryScore * 100)} percent match`}>
+              {Math.round(primaryScore * 100)}%
+            </span>
+          </div>
 
-          {explanation.explanation.deterministicScore !== undefined && (
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600 dark:text-gray-400">Deterministic Signals</span>
-                <span className="font-medium" aria-label={`${Math.round(explanation.explanation.deterministicScore * 100)} percent`}>{Math.round(explanation.explanation.deterministicScore * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2" role="meter" aria-valuenow={Math.round(explanation.explanation.deterministicScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Deterministic signals score">
-                <div
-                  className="bg-green-500 h-2 rounded-full transition-all"
-                  style={{ width: `${explanation.explanation.deterministicScore * 100}%` }}
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-          )}
+          {/* Visual strength indicator */}
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3" role="meter" aria-valuenow={Math.round(primaryScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Match strength">
+            <div
+              className={`h-3 rounded-full transition-all ${
+                primaryScore >= 0.8 
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+                  : primaryScore >= 0.6 
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                    : 'bg-gradient-to-r from-yellow-500 to-orange-500'
+              }`}
+              style={{ width: `${primaryScore * 100}%` }}
+              aria-hidden="true"
+            />
+          </div>
 
-          {explanation.explanation.semanticScore !== undefined && (
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
-                  Semantic Similarity
-                </span>
-                <span className="font-medium" aria-label={`${Math.round(explanation.explanation.semanticScore * 100)} percent`}>{Math.round(explanation.explanation.semanticScore * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2" role="meter" aria-valuenow={Math.round(explanation.explanation.semanticScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Semantic similarity score">
-                <div
-                  className="bg-blue-500 h-2 rounded-full transition-all"
-                  style={{ width: `${explanation.explanation.semanticScore * 100}%` }}
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-          )}
-
-          {explanation.explanation.structuralScore !== undefined && (
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                  <TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />
-                  Structural Features
-                </span>
-                <span className="font-medium" aria-label={`${Math.round(explanation.explanation.structuralScore * 100)} percent`}>{Math.round(explanation.explanation.structuralScore * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2" role="meter" aria-valuenow={Math.round(explanation.explanation.structuralScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Structural features score">
-                <div
-                  className="bg-purple-500 h-2 rounded-full transition-all"
-                  style={{ width: `${explanation.explanation.structuralScore * 100}%` }}
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-          )}
-
-          {explanation.explanation.mlScore !== undefined && (
-            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="font-semibold text-gray-700 dark:text-gray-300">Combined ML Score</span>
-                <span className="font-semibold" aria-label={`${Math.round(explanation.explanation.mlScore * 100)} percent`}>{Math.round(explanation.explanation.mlScore * 100)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5" role="meter" aria-valuenow={Math.round(explanation.explanation.mlScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Combined ML score">
-                <div
-                  className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2.5 rounded-full transition-all"
-                  style={{ width: `${explanation.explanation.mlScore * 100}%` }}
-                  aria-hidden="true"
-                />
-              </div>
-            </div>
-          )}
+          <div className="text-xs text-gray-500 text-center">
+            {primaryScore >= 0.8 ? '🔥 Strong match' : primaryScore >= 0.6 ? '👍 Good match' : '⚠️ Weak match'}
+          </div>
         </div>
+
+        {/* Show Details Toggle */}
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+          aria-expanded={showDetails}
+          aria-controls="detailed-scores"
+        >
+          {showDetails ? (
+            <>
+              <ChevronUp className="w-4 h-4" aria-hidden="true" />
+              Hide Details
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-4 h-4" aria-hidden="true" />
+              Show Detailed Scores
+            </>
+          )}
+        </button>
+
+        {/* Detailed Score Breakdown (Collapsible) */}
+        {showDetails && (
+          <div id="detailed-scores" className="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Detailed Breakdown</div>
+
+            {explanation.explanation.deterministicScore !== undefined && (
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600 dark:text-gray-400">Deterministic Signals</span>
+                  <span className="font-medium" aria-label={`${Math.round(explanation.explanation.deterministicScore * 100)} percent`}>{Math.round(explanation.explanation.deterministicScore * 100)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2" role="meter" aria-valuenow={Math.round(explanation.explanation.deterministicScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Deterministic signals score">
+                  <div
+                    className="bg-green-500 h-2 rounded-full transition-all"
+                    style={{ width: `${explanation.explanation.deterministicScore * 100}%` }}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+            )}
+
+            {explanation.explanation.semanticScore !== undefined && (
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
+                    Semantic Similarity
+                  </span>
+                  <span className="font-medium" aria-label={`${Math.round(explanation.explanation.semanticScore * 100)} percent`}>{Math.round(explanation.explanation.semanticScore * 100)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2" role="meter" aria-valuenow={Math.round(explanation.explanation.semanticScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Semantic similarity score">
+                  <div
+                    className="bg-blue-500 h-2 rounded-full transition-all"
+                    style={{ width: `${explanation.explanation.semanticScore * 100}%` }}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+            )}
+
+            {explanation.explanation.structuralScore !== undefined && (
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                    <TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />
+                    Structural Features
+                  </span>
+                  <span className="font-medium" aria-label={`${Math.round(explanation.explanation.structuralScore * 100)} percent`}>{Math.round(explanation.explanation.structuralScore * 100)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2" role="meter" aria-valuenow={Math.round(explanation.explanation.structuralScore * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Structural features score">
+                  <div
+                    className="bg-purple-500 h-2 rounded-full transition-all"
+                    style={{ width: `${explanation.explanation.structuralScore * 100}%` }}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Feedback for ML Links */}
         {isMLAssisted && (
@@ -274,15 +313,17 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
                 <button
                   onClick={() => submitFeedback('positive')}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-700 dark:text-green-300 rounded-lg transition"
+                  aria-label="Mark as helpful"
                 >
-                  <ThumbsUp className="w-4 h-4" />
+                  <ThumbsUp className="w-4 h-4" aria-hidden="true" />
                   Yes
                 </button>
                 <button
                   onClick={() => submitFeedback('negative')}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 rounded-lg transition"
+                  aria-label="Mark as not helpful"
                 >
-                  <ThumbsDown className="w-4 h-4" />
+                  <ThumbsDown className="w-4 h-4" aria-hidden="true" />
                   No
                 </button>
               </div>
@@ -290,11 +331,13 @@ export default function LinkExplanationPanel({ sourceId, targetId, onClose }: Li
           </div>
         )}
 
-        {/* Metadata */}
-        <div className="pt-4 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 space-y-1">
-          <div>Type: {explanation.relationshipType}</div>
-          <div>Created: {new Date(explanation.createdAt).toLocaleDateString()}</div>
-        </div>
+        {/* Metadata (Collapsible) */}
+        {showDetails && (
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 space-y-1">
+            <div>Type: {explanation.relationshipType}</div>
+            <div>Created: {new Date(explanation.createdAt).toLocaleDateString()}</div>
+          </div>
+        )}
       </div>
     </div>
   );

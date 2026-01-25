@@ -10,7 +10,7 @@ import {
   Search, Command, ExternalLink, Clock, User, Link as LinkIcon,
   X, ChevronRight, MessageSquare, UserPlus, CheckCircle2, AlertCircle,
   Hash, Github, Slack, FileText, Send, MoreHorizontal, Network, HelpCircle,
-  Settings as SettingsIcon
+  Settings as SettingsIcon, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -43,6 +43,7 @@ export default function AmbientFeed() {
   const [actionLoading, setActionLoading] = useState(false);
   const [commandInput, setActionInput] = useState('');
   const [isHelpOpen, setHelpOpen] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   useSocket();
 
@@ -356,62 +357,96 @@ export default function AmbientFeed() {
         <main id="main-content" className="flex-1 overflow-y-auto p-10 space-y-10 scrollbar-hide" role="main" aria-label="Ambient feed content">
           {contextGroups.length > 0 ? (
             <div className="max-w-4xl mx-auto space-y-12">
-              {contextGroups.map((group) => (
-                <div key={group.id} className="relative">
-                  {/* Timeline logic line */}
-                  <div className="absolute left-[-24px] top-0 bottom-0 w-[2px] bg-gradient-to-b from-indigo-500/50 via-slate-800 to-transparent" />
-                  
-                  <div className="mb-6 flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)] z-10" />
-                      <h2 className="text-lg font-bold text-white group cursor-pointer flex items-center">
-                        {group.name}
-                        <ChevronRight className="w-4 h-4 ml-1 text-slate-600 group-hover:text-indigo-400 transition" />
-                      </h2>
-                    </div>
-                    <div className="flex items-center text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-                      <Clock className="w-3 h-3 mr-1" />
-                      Last updated {new Date(group.updatedAt).toLocaleTimeString()}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-3">
-                    {group.members.map((member) => (
-                      <div 
-                        key={member.record.id}
-                        onClick={() => setSelectedArtifact(member.record)}
-                        className={cn(
-                          "bg-slate-900/40 border border-slate-800/50 rounded-xl p-4 flex items-start space-x-4 hover:bg-slate-800/50 hover:border-slate-700 transition cursor-pointer group relative overflow-hidden",
-                          selectedArtifact?.id === member.record.id && "border-indigo-500/50 bg-indigo-500/5"
-                        )}
+              {contextGroups.map((group) => {
+                const isCollapsed = collapsedGroups.has(group.id);
+                
+                return (
+                  <div key={group.id} className="relative">
+                    {/* Timeline logic line */}
+                    <div className="absolute left-[-24px] top-0 bottom-0 w-[2px] bg-gradient-to-b from-indigo-500/50 via-slate-800 to-transparent" />
+                    
+                    <div className="mb-4">
+                      <button
+                        onClick={() => {
+                          const newCollapsed = new Set(collapsedGroups);
+                          if (isCollapsed) {
+                            newCollapsed.delete(group.id);
+                          } else {
+                            newCollapsed.add(group.id);
+                          }
+                          setCollapsedGroups(newCollapsed);
+                        }}
+                        className="w-full flex items-center justify-between hover:bg-slate-900/30 rounded-lg p-3 transition group"
+                        aria-expanded={!isCollapsed}
+                        aria-controls={`group-${group.id}`}
                       >
-                        <div className="p-2.5 bg-slate-950 rounded-lg text-slate-400 group-hover:text-indigo-400 border border-slate-800 group-hover:border-indigo-500/20 transition shadow-inner">
-                          {getPlatformIcon(member.record.sourcePlatform)}
+                        <div className="flex items-center space-x-3">
+                          <div className="w-3 h-3 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)] z-10" aria-hidden="true" />
+                          <h2 className="text-lg font-bold text-white flex items-center">
+                            {group.name}
+                            <span className="ml-2 text-xs font-normal text-slate-500">
+                              ({group.members.length} artifact{group.members.length !== 1 ? 's' : ''})
+                            </span>
+                          </h2>
                         </div>
-                        <div className="flex-1 min-w-0 pt-0.5">
-                          <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition truncate pr-6">{member.record.title}</h3>
-                          <div className="flex items-center mt-2 space-x-4">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-950 rounded border border-slate-800">
-                              {member.record.sourcePlatform}
-                            </span>
-                            <span className="flex items-center text-[11px] text-slate-500">
-                              <User className="w-3 h-3 mr-1 opacity-50" />
-                              {member.record.author}
-                            </span>
-                            <span className="flex items-center text-[11px] text-slate-500">
-                              <Clock className="w-3 h-3 mr-1 opacity-50" />
-                              {new Date(member.record.timestamp).toLocaleDateString()}
-                            </span>
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+                            <Clock className="w-3 h-3 mr-1" aria-hidden="true" />
+                            {new Date(group.updatedAt).toLocaleTimeString()}
                           </div>
+                          {isCollapsed ? (
+                            <ChevronDown className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 transition" aria-hidden="true" />
+                          ) : (
+                            <ChevronUp className="w-5 h-5 text-slate-500 group-hover:text-indigo-400 transition" aria-hidden="true" />
+                          )}
                         </div>
-                        <div className="opacity-0 group-hover:opacity-100 transition absolute right-4 top-4">
-                          <MoreHorizontal className="w-4 h-4 text-slate-500" />
-                        </div>
+                      </button>
+                    </div>
+
+                    {/* Collapsible content */}
+                    {!isCollapsed && (
+                      <div id={`group-${group.id}`} className="grid grid-cols-1 gap-3">
+                        {group.members.map((member) => (
+                          <div 
+                            key={member.record.id}
+                            onClick={() => {
+                              setSelectedArtifact(member.record);
+                              setDetailPanelOpen(true);
+                            }}
+                            className={cn(
+                              "bg-slate-900/40 border border-slate-800/50 rounded-xl p-4 flex items-start space-x-4 hover:bg-slate-800/50 hover:border-slate-700 transition cursor-pointer group relative overflow-hidden",
+                              selectedArtifact?.id === member.record.id && "border-indigo-500/50 bg-indigo-500/5"
+                            )}
+                          >
+                            <div className="p-2.5 bg-slate-950 rounded-lg text-slate-400 group-hover:text-indigo-400 border border-slate-800 group-hover:border-indigo-500/20 transition shadow-inner">
+                              {getPlatformIcon(member.record.sourcePlatform)}
+                            </div>
+                            <div className="flex-1 min-w-0 pt-0.5">
+                              <h3 className="text-sm font-semibold text-slate-200 group-hover:text-white transition truncate pr-6">{member.record.title}</h3>
+                              <div className="flex items-center mt-2 space-x-4">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1.5 py-0.5 bg-slate-950 rounded border border-slate-800">
+                                  {member.record.sourcePlatform}
+                                </span>
+                                <span className="flex items-center text-[11px] text-slate-500">
+                                  <User className="w-3 h-3 mr-1 opacity-50" aria-hidden="true" />
+                                  {member.record.author}
+                                </span>
+                                <span className="flex items-center text-[11px] text-slate-500">
+                                  <Clock className="w-3 h-3 mr-1 opacity-50" aria-hidden="true" />
+                                  {new Date(member.record.timestamp).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="opacity-0 group-hover:opacity-100 transition absolute right-4 top-4">
+                              <MoreHorizontal className="w-4 h-4 text-slate-500" aria-hidden="true" />
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : records.length > 0 ? (
             <div className="max-w-4xl mx-auto space-y-8">

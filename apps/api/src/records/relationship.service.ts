@@ -12,14 +12,28 @@ export class RelationshipService {
   // ML Specs Phase 3: Production thresholds
   private readonly DETERMINISTIC_THRESHOLD = 0.7;
   private readonly ML_THRESHOLD = 0.75; // Higher threshold for ML-only links (precision first)
-  private readonly ML_ENABLED = true; // Feature flag for rollback
+  private readonly ML_SHADOW_MODE: boolean;
+  private readonly ML_ENABLED: boolean;
 
   constructor(
     private prisma: PrismaService,
     private mlScoringService: MLScoringService,
     private graphService: GraphService,
     private tfidfService: TfIdfService,
-  ) {}
+  ) {
+    // ML_SHADOW_MODE: true = log ML predictions but don't create links
+    // ML_SHADOW_MODE: false = create links based on ML predictions
+    this.ML_SHADOW_MODE = process.env.ML_SHADOW_MODE !== 'false';
+    this.ML_ENABLED = process.env.ML_ENABLED === 'true';
+    
+    if (this.ML_SHADOW_MODE) {
+      this.logger.log('ML Shadow Mode: ENABLED - ML predictions will be logged but not actioned');
+    } else if (this.ML_ENABLED) {
+      this.logger.log('ML Production Mode: ENABLED - ML predictions will create links');
+    } else {
+      this.logger.log('ML: DISABLED - Only deterministic linking active');
+    }
+  }
 
   async discoverRelationships(newRecord: UnifiedRecord) {
     // Wrap in transaction to prevent race conditions
@@ -63,9 +77,10 @@ export class RelationshipService {
           };
         } else if (
           this.ML_ENABLED &&
+          !this.ML_SHADOW_MODE &&
           mlScoreResult.mlScore >= this.ML_THRESHOLD
         ) {
-          // ML-assisted link (new behavior)
+          // ML-assisted link (production mode only)
           shouldCreateLink = true;
           finalScore = mlScoreResult.mlScore;
           discoveryMethod = 'ml_assisted';
@@ -80,6 +95,26 @@ export class RelationshipService {
           this.logger.log(
             `ML-assisted link: ${newRecord.externalId} <-> ${candidate.externalId} ` +
             `(ML: ${mlScoreResult.mlScore.toFixed(2)}, Det: ${deterministicScore.toFixed(2)})`,
+          );
+        } else if (
+          this.ML_ENABLED &&
+          this.ML_SHADOW_MODE &&
+          mlScoreResult.mlScore >= this.ML_THRESHOLD
+        ) {
+          // Shadow mode: Log what would have been linked
+          shouldCreateLink = false;
+          explanation = {
+            deterministicScore,
+            mlScore: mlScoreResult.mlScore,
+            semanticScore: mlScoreResult.semanticScore,
+            structuralScore: mlScoreResult.structuralScore,
+            method: 'ml_shadow',
+            reason: 'ML threshold met but shadow mode active (link NOT created)',
+          };
+          this.logger.warn(
+            `[SHADOW] ML would link: ${newRecord.externalId} <-> ${candidate.externalId} ` +
+            `(ML: ${mlScoreResult.mlScore.toFixed(2)}, Det: ${deterministicScore.toFixed(2)}) ` +
+            `[Link NOT created - Shadow Mode]`,
           );
         } else {
           // No link created, but log shadow score for analysis
