@@ -5,6 +5,7 @@ import { MLScoringService } from './ml-scoring.service';
 import { GraphService } from './graph.service';
 import { TfIdfService } from '../common/tfidf.service';
 import { RedisService } from '../common/redis.service';
+import { TracingService } from '../common/tracing.service';
 
 @Injectable()
 export class RelationshipService {
@@ -22,6 +23,7 @@ export class RelationshipService {
     private graphService: GraphService,
     private tfidfService: TfIdfService,
     private redisService: RedisService,
+    private tracingService: TracingService,
   ) {
     // ML_SHADOW_MODE: true = log ML predictions but don't create links
     // ML_SHADOW_MODE: false = create links based on ML predictions
@@ -38,11 +40,19 @@ export class RelationshipService {
   }
 
   async discoverRelationships(newRecord: UnifiedRecord) {
-    // Acquire distributed lock to prevent duplicate link creation across instances
-    const lockResource = `relationship_discovery:${newRecord.id}`;
+    return await this.tracingService.withSpan(
+      'relationship.discovery',
+      async (span) => {
+        span.setAttribute('record.id', newRecord.id);
+        span.setAttribute('record.platform', newRecord.sourcePlatform);
+        span.setAttribute('record.type', newRecord.artifactType);
+        span.setAttribute('user.id', newRecord.userId);
+
+        // Acquire distributed lock to prevent duplicate link creation across instances
+        const lockResource = `relationship_discovery:${newRecord.id}`;
     
-    return await this.redisService.withLock(
-      lockResource,
+        return await this.redisService.withLock(
+          lockResource,
       async () => {
         // Wrap in transaction to prevent race conditions
         return await this.prisma.$transaction(async (tx) => {
@@ -181,8 +191,14 @@ export class RelationshipService {
       maxWait: 5000, // Maximum wait time in ms
       timeout: 30000, // Maximum transaction time in ms
     });
+        
+        span.addEvent('relationship.discovery.complete', {
+          'candidates.count': candidates.length,
+        });
       },
       15000, // Lock TTL: 15 seconds (longer than transaction timeout)
+    );
+      },
     );
   }
 

@@ -1,4 +1,9 @@
 import 'dotenv/config';
+import { initializeTracing } from './common/tracing';
+
+// Initialize tracing BEFORE any other imports to ensure all modules are instrumented
+initializeTracing();
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';

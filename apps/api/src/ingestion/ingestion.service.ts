@@ -12,6 +12,7 @@ import { AuditService } from '../audit/audit.service';
 import { RelationshipService } from '../records/relationship.service';
 import { GraphService } from '../records/graph.service';
 import { OAuthService } from './oauth.service';
+import { TracingService } from '../common/tracing.service';
 
 @Injectable()
 export class IngestionService {
@@ -27,6 +28,7 @@ export class IngestionService {
     private relationshipService: RelationshipService,
     private graphService: GraphService,
     private oauthService: OAuthService,
+    private tracingService: TracingService,
   ) {
     this.adapters.set('github', new GithubAdapter());
     this.adapters.set('jira', new JiraAdapter());
@@ -35,14 +37,22 @@ export class IngestionService {
   }
 
   async runIngestion(dataSourceId: string) {
-    const dataSource = await this.prisma.dataSource.findUnique({
-      where: { id: dataSourceId },
-      include: { user: true },
+    return await this.tracingService.withSpan(
+      'ingestion.run',
+      async (span) => {
+        span.setAttribute('datasource.id', dataSourceId);
+
+        const dataSource = await this.prisma.dataSource.findUnique({
+          where: { id: dataSourceId },
+          include: { user: true },
     });
 
     if (!dataSource) {
       throw new Error('Data source not found');
     }
+
+    span.setAttribute('datasource.platform', dataSource.providerName);
+    span.setAttribute('user.id', dataSource.userId);
 
     const adapter = this.adapters.get(dataSource.providerName);
     if (!adapter) {
@@ -280,6 +290,8 @@ export class IngestionService {
       });
       throw error;
     }
+      },
+    );
   }
 
   async getSources(userId: string) {
