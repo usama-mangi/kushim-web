@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from 'sonner';
 import Providers from "./providers";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary } from "../components/error";
 
 export const metadata: Metadata = {
   title: "Kushim Dashboard",

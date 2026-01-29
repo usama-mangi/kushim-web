@@ -12,6 +12,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import CreateGroupModal from '../components/CreateGroupModal';
 import ContextGroupManager from '../components/ContextGroupManager';
+import { ErrorBoundary, FeatureErrorFallback } from '../../components/error';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -312,7 +313,9 @@ function ContextContent() {
               </div>
             </div>
           ) : graphData.nodes.length > 0 ? (
-            <GraphVisualization data={graphData} />
+            <ErrorBoundary fallback={<FeatureErrorFallback featureName="Graph Visualization" />}>
+              <GraphVisualization data={graphData} />
+            </ErrorBoundary>
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center py-20">
