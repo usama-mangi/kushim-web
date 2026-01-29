@@ -8,6 +8,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { Logger } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 // Validate critical environment variables before starting the application
 function validateEnvironment() {
@@ -70,12 +71,50 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     rawBody: true,
   });
+  
   app.enableCors({
     origin: '*', // Allow all origins for development
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
+  
   app.useGlobalFilters(new HttpExceptionFilter());
-  await app.listen(process.env.PORT ?? 3001);
+
+  // Setup Swagger API Documentation
+  const config = new DocumentBuilder()
+    .setTitle('Kushim API')
+    .setDescription('Ambient context ledger - automatically captures and links work artifacts across platforms')
+    .setVersion('1.0')
+    .addTag('auth', 'Authentication endpoints (login, signup, OAuth)')
+    .addTag('users', 'User management')
+    .addTag('records', 'Unified records (work artifacts from all platforms)')
+    .addTag('graph', 'Context groups and relationship graph')
+    .addTag('links', 'Record links (relationships between artifacts)')
+    .addTag('ingestion', 'Data ingestion from platforms')
+    .addTag('oauth', 'OAuth platform connections')
+    .addTag('webhooks', 'Real-time platform webhooks')
+    .addTag('actions', 'Action execution (comment, assign, close, etc.)')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth',
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
+
+  const logger = new Logger('Bootstrap');
+  const port = process.env.PORT ?? 3001;
+  
+  await app.listen(port);
+  logger.log(`🚀 Kushim API started on http://localhost:${port}`);
+  logger.log(`📖 API Documentation: http://localhost:${port}/api/docs`);
 }
 bootstrap();

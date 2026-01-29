@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -21,10 +22,24 @@ interface RegisterDto {
   username?: string;
 }
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', example: 'user@example.com' },
+        password: { type: 'string', example: 'password123' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Login successful, returns JWT token' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 429, description: 'Too many login attempts' })
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(LocalAuthGuard)
   @Post('login')
@@ -32,16 +47,40 @@ export class AuthController {
     return this.authService.login(req.user);
   }
 
+  @ApiOperation({ summary: 'Register a new user account' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', example: 'user@example.com' },
+        password: { type: 'string', example: 'password123' },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'User registered successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input or user already exists' })
   @Post('register')
   async register(@Body() body: RegisterDto) {
     return this.authService.register(body.email, body.password);
   }
 
+  @ApiOperation({ summary: 'Request password reset email' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', example: 'user@example.com' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Password reset email sent' })
   @Post('forgot-password')
   async forgotPassword(@Body() body: { email: string }) {
     return this.authService.forgotPassword(body.email);
   }
 
+  @ApiOperation({ summary: 'Initiate GitHub OAuth login' })
+  @ApiResponse({ status: 302, description: 'Redirects to GitHub OAuth' })
   @Get('github')
   @UseGuards(AuthGuard('github'))
   async githubLogin() {
