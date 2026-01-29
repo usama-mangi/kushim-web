@@ -30,7 +30,6 @@ Thumbs.db
 
 # Misc
 .turbo/
-.github
 coverage/
 
 # Backup files

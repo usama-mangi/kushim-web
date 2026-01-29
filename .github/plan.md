@@ -447,56 +447,87 @@ async refreshIfNeeded(credentials) {
 
 ---
 
-## Phase 3: Polish (Low - P3)
+## Phase 3: Polish (Low - P3) ✅ **COMPLETE**
 **Timeline:** 3 days  
+**Status:** ✅ **ALL TASKS COMPLETE**
 
 ### Tasks
 
-#### ✅ L1: Remove Backup Files
-- [ ] Delete backup files from repo
-- [ ] Add to .gitignore
+#### ✅ L1: Remove Backup Files (COMPLETE)
+- [x] ~~Delete backup files from repo~~ ✅
+- [x] ~~Add to .gitignore~~ ✅
 
 **Effort:** 5 minutes  
+**Status:** ✅ **COMPLETE** - Removed page.tsx.backup, added patterns to .gitignore
 
 ---
 
-#### ✅ L2: Add API Documentation
-- [ ] Install @nestjs/swagger
-- [ ] Add decorators to controllers
-- [ ] Serve docs at /api/docs
+#### ✅ L2: Add API Documentation (COMPLETE)
+- [x] ~~Install @nestjs/swagger~~ ✅
+- [x] ~~Add decorators to controllers~~ ✅
+- [x] ~~Serve docs at /api/docs~~ ✅
 
 **Effort:** 1 day  
+**Status:** ✅ **COMPLETE** - Swagger UI available at http://localhost:3001/api/docs
+
+**Deliverables:**
+- ✅ Swagger module configured in main.ts
+- ✅ API docs at /api/docs endpoint
+- ✅ JWT Bearer authentication in Swagger UI
+- ✅ Decorated Auth and Records controllers
+- ✅ API tags for all modules (auth, users, records, graph, links, ingestion, oauth, webhooks, actions)
+- ✅ Query parameters and responses documented
 
 ---
 
-#### ✅ L3: Make Pagination Configurable
-- [ ] Create constants file
-- [ ] Add env vars for limits
+#### ✅ L3: Make Pagination Configurable (COMPLETE)
+- [x] ~~Create constants file~~ ✅
+- [x] ~~Add env vars for limits~~ ✅
 
 **Effort:** 1 hour  
+**Status:** ✅ **COMPLETE** - All pagination configurable via environment variables
+
+**Deliverables:**
+- ✅ Created `src/common/constants.ts` with configurable values
+- ✅ Pagination constants (PAGE_SIZE, MAX_PAGE_SIZE, CONTEXT_GROUP_PAGE_SIZE, etc.)
+- ✅ Rate limiting constants (OAUTH_RPM, API_RPM, WEBHOOK_RPM)
+- ✅ Cache TTL constants (CONTEXT_GROUPS, USER_PROFILES, PLATFORM_DATA)
+- ✅ ML configuration constants (SHADOW_MODE, THRESHOLD, DETERMINISTIC_THRESHOLD)
+- ✅ Distributed locking constants (TTL, RETRY_COUNT, RETRY_DELAY)
+- ✅ Updated all services to use constants instead of hardcoded values
+- ✅ Documented all env vars in .env.example
 
 ---
 
-#### ✅ L4: Add Rate Limiting to OAuth
-- [ ] Add @Throttle() to OAuth routes
-- [ ] Configure limits
+#### ✅ L4: Add Rate Limiting to OAuth (COMPLETE)
+- [x] ~~Add @Throttle() to OAuth routes~~ ✅
+- [x] ~~Configure limits~~ ✅
 
 **Effort:** 1 hour  
+**Status:** ✅ **COMPLETE** - Rate limiting on OAuth and webhooks
+
+**Deliverables:**
+- ✅ Added rate limiting to all OAuth endpoints (connect, callback)
+- ✅ Added rate limiting to all webhook endpoints (GitHub, Slack, Jira, Google)
+- ✅ Configurable via RATE_LIMITS constants
+- ✅ OAuth: 10 req/min (default, configurable via OAUTH_RATE_LIMIT)
+- ✅ Webhooks: 1000 req/min (default, configurable via WEBHOOK_RATE_LIMIT)
+- ✅ Prevents abuse and DoS attacks
 
 ---
 
 ## Summary
 
 **Total Timeline:** ~50 days (10 weeks)
-- Phase 0 (Critical): 7-9 days
-- Phase 1 (High): 18 days
-- Phase 2 (Medium): 22 days
-- Phase 3 (Low): 3 days
+- Phase 0 (Critical): 7-9 days ✅ **COMPLETE**
+- Phase 1 (High): 18 days ✅ **COMPLETE**
+- Phase 2 (Medium): 22 days ⚠️ **PARTIAL** (M6 in progress - 27% coverage)
+- Phase 3 (Low): 3 days ✅ **COMPLETE**
 
 **Launch Readiness:**
-- After Phase 0: Limited pilot (5-10 users)
-- After Phase 1: Production rollout
-- After Phase 2: Fully scalable
-- After Phase 3: Polished product
+- After Phase 0: Limited pilot (5-10 users) ✅
+- After Phase 1: Production rollout ✅
+- After Phase 2: Fully scalable ⚠️ (M6 test coverage in progress)
+- After Phase 3: Polished product ✅
 
 **Reference:** Full analysis in `files/findings.md`
