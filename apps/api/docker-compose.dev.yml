@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # Jaeger all-in-one for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: kushim-jaeger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger collector HTTP
+      - "14250:14250"  # Jaeger collector gRPC
+      - "6831:6831/udp"  # Jaeger agent (UDP)
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - kushim-network
+
+  # Redis for caching and distributed locking
+  redis:
+    image: redis:7-alpine
+    container_name: kushim-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - kushim-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: kushim-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: kushim_db
+      POSTGRES_USER: kushim
+      POSTGRES_PASSWORD: kushim_dev_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - kushim-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kushim"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Neo4j graph database
+  neo4j:
+    image: neo4j:5-community
+    container_name: kushim-neo4j
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    environment:
+      NEO4J_AUTH: neo4j/kushim_dev_password
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_memory_heap_max__size: 2G
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    networks:
+      - kushim-network
+    healthcheck:
+      test: ["CMD-SHELL", "neo4j status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis-data:
+  postgres-data:
+  neo4j-data:
+  neo4j-logs:
+
+networks:
+  kushim-network:
+    driver: bridge
