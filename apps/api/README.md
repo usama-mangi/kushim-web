@@ -82,6 +82,11 @@ $ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 # Run database migrations
 $ npx prisma migrate deploy
+
+# Setup Neo4j indexes for tenant isolation (REQUIRED for security)
+$ ./scripts/create-neo4j-indices.sh
+# OR
+$ ts-node scripts/setup-neo4j-indexes.ts
 ```
 
 ```bash

@@ -211,9 +211,11 @@ export class GraphService {
   }
 
   async updateGroupMetadata(groupId: string) {
+    // Get group first to check userId (if needed for security)
     // Get all artifacts in the group
     const cypher = `
       MATCH (g:ContextGroup {id: $groupId})<-[:BELONGS_TO]-(a:Artifact)
+      WHERE a.userId = g.userId
       RETURN a.title as title, a.body as body, a.metadata as metadata
     `;
     const artifacts = await this.neo4jService.run(cypher, { groupId });
@@ -301,14 +303,16 @@ export class GraphService {
     return result.length > 0 ? result[0].get('coherenceScore') : 1.0;
   }
 
-  async addToContextGroup(groupId: string, recordId: string) {
+  async addToContextGroup(groupId: string, recordId: string, userId: string) {
     const cypher = `
       MATCH (g:ContextGroup {id: $groupId})
+      WHERE g.userId = $userId
       MATCH (a:Artifact {id: $recordId})
+      WHERE a.userId = $userId
       MERGE (a)-[:BELONGS_TO {weight: 1.0}]->(g)
       SET g.updatedAt = datetime()
     `;
-    await this.neo4jService.run(cypher, { groupId, recordId });
+    await this.neo4jService.run(cypher, { groupId, recordId, userId });
     
     // Update group metadata
     await this.updateGroupMetadata(groupId);

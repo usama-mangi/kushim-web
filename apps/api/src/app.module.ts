@@ -15,6 +15,7 @@ import { ActionsModule } from './actions/actions.module';
 import { AuditInterceptor } from './audit/audit.interceptor';
 import { CommonModule } from './common/common.module';
 import { RedisThrottlerStorage } from './common/throttler-storage';
+import { WebhookModule } from './webhooks/webhook.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RedisThrottlerStorage } from './common/throttler-storage';
     NotificationsModule,
     AuditModule,
     ActionsModule,
+    WebhookModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {

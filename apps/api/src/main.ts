@@ -67,7 +67,9 @@ async function bootstrap() {
   // Validate environment before creating app
   validateEnvironment();
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true,
+  });
   app.enableCors({
     origin: '*', // Allow all origins for development
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',

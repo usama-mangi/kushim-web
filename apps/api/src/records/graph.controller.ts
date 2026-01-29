@@ -218,7 +218,7 @@ export class GraphController {
     // Add artifacts if provided
     if (body.artifactIds && body.artifactIds.length > 0) {
       for (const artifactId of body.artifactIds) {
-        await this.graphService.addToContextGroup(groupId, artifactId);
+        await this.graphService.addToContextGroup(groupId, artifactId, req.user.userId);
       }
     }
 
@@ -227,13 +227,15 @@ export class GraphController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Patch('context-groups/:id')
   async updateContextGroup(
     @Param('id') groupId: string,
-    @Body() body: { name?: string }
+    @Body() body: { name?: string },
+    @Request() req: any
   ) {
     if (body.name) {
-      await this.graphService.renameContextGroup(groupId, body.name);
+      await this.graphService.renameContextGroup(groupId, body.name, req.user.userId);
     }
     return { success: true, message: 'Context group updated' };
   }
@@ -241,8 +243,11 @@ export class GraphController {
   @UseGuards(JwtAuthGuard)
   @Delete('context-groups/:id')
   @HttpCode(204)
-  async deleteContextGroup(@Param('id') groupId: string) {
-    await this.graphService.deleteContextGroup(groupId);
+  async deleteContextGroup(
+    @Param('id') groupId: string,
+    @Request() req: any
+  ) {
+    await this.graphService.deleteContextGroup(groupId, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -259,7 +264,7 @@ export class GraphController {
     this.logger.log(`Adding artifact ${body.artifactId} to group ${groupId} for user ${req.user.userId}`);
     
     try {
-      await this.graphService.addToContextGroup(groupId, body.artifactId);
+      await this.graphService.addToContextGroup(groupId, body.artifactId, req.user.userId);
       this.logger.log(`Successfully added artifact ${body.artifactId} to group ${groupId}`);
       return { success: true, message: 'Artifact added to group' };
     } catch (error) {
@@ -273,12 +278,13 @@ export class GraphController {
   @HttpCode(204)
   async removeArtifactFromGroup(
     @Param('id') groupId: string,
-    @Param('artifactId') artifactId: string
+    @Param('artifactId') artifactId: string,
+    @Request() req: any
   ) {
     this.logger.log(`Removing artifact ${artifactId} from group ${groupId}`);
     
     try {
-      await this.graphService.removeFromContextGroup(groupId, artifactId);
+      await this.graphService.removeFromContextGroup(groupId, artifactId, req.user.userId);
       this.logger.log(`Successfully removed artifact ${artifactId} from group ${groupId}`);
     } catch (error) {
       this.logger.error(`Failed to remove artifact ${artifactId} from group ${groupId}`, error.stack);
@@ -290,12 +296,13 @@ export class GraphController {
   @Post('context-groups/:id/merge')
   async mergeGroups(
     @Param('id') targetGroupId: string,
-    @Body() body: { sourceGroupId: string }
+    @Body() body: { sourceGroupId: string },
+    @Request() req: any
   ) {
     if (!body.sourceGroupId) {
       return { success: false, message: 'Source group ID is required' };
     }
-    await this.graphService.mergeContextGroups(targetGroupId, body.sourceGroupId);
+    await this.graphService.mergeContextGroups(targetGroupId, body.sourceGroupId, req.user.userId);
     return { success: true, message: 'Groups merged successfully' };
   }
 

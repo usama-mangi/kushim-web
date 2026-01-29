@@ -65,6 +65,10 @@ export class RelationshipService {
           );
 
           const candidates = await this.graphService.hydrateRecordsFromIds(candidateIds);
+          
+          span.addEvent('relationship.discovery.candidates_found', {
+            'candidates.count': candidates.length,
+          });
 
       for (const candidate of candidates) {
         const deterministicScore = await this.calculateLinkScoreOptimized(newRecord, candidate);
@@ -191,10 +195,6 @@ export class RelationshipService {
       maxWait: 5000, // Maximum wait time in ms
       timeout: 30000, // Maximum transaction time in ms
     });
-        
-        span.addEvent('relationship.discovery.complete', {
-          'candidates.count': candidates.length,
-        });
       },
       15000, // Lock TTL: 15 seconds (longer than transaction timeout)
     );
