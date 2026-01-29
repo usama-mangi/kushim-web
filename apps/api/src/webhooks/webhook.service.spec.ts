@@ -169,16 +169,4 @@ describe('WebhookService', () => {
       expect(result).toBeNull();
     });
   });
-      jest
-        .spyOn(prismaService.platformConnection, 'findFirst')
-        .mockResolvedValue(null);
-
-      const result = await service.getUserIdForPlatformResource(
-        'github',
-        'resource-123',
-      );
-
-      expect(result).toBeNull();
-    });
-  });
 });

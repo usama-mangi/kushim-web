@@ -36,6 +36,15 @@ export const createMockRedisService = () => {
       return 0;
     }),
 
+    // Cache invalidation helpers
+    invalidateUserContextGroups: jest.fn(async (userId: string) => {
+      return true;
+    }),
+
+    invalidateContextGroup: jest.fn(async (groupId: string) => {
+      return true;
+    }),
+
     // Check if Redis is enabled
     get enabled() {
       return true;
