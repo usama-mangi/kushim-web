@@ -9,9 +9,11 @@ import {
   BadRequestException,
   Logger
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OAuthService } from './oauth.service';
+import { RATE_LIMITS } from '../common/constants';
 
 @Controller('ingestion/oauth')
 export class OAuthController {
@@ -19,7 +21,12 @@ export class OAuthController {
 
   constructor(private oauthService: OAuthService) {}
 
+  /**
+   * Initiate OAuth flow - protected by JWT and rate limited
+   * Rate limit: configurable via OAUTH_RATE_LIMIT env var (default: 10 req/min)
+   */
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: RATE_LIMITS.OAUTH_RPM, ttl: 60000 } })
   @Get(':provider/connect')
   async connect(
     @Request() req: any,
@@ -29,6 +36,11 @@ export class OAuthController {
     return { url };
   }
 
+  /**
+   * OAuth callback endpoint - rate limited to prevent abuse
+   * Rate limit: configurable via OAUTH_RATE_LIMIT env var (default: 10 req/min)
+   */
+  @Throttle({ default: { limit: RATE_LIMITS.OAUTH_RPM, ttl: 60000 } })
   @Get(':provider/callback')
   async callback(
     @Param('provider') provider: string,

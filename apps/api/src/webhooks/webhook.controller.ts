@@ -9,9 +9,11 @@ import {
   Logger,
   Req,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { WebhookService } from './webhook.service';
+import { RATE_LIMITS } from '../common/constants';
 
 @Controller('webhooks')
 export class WebhookController {
@@ -19,8 +21,13 @@ export class WebhookController {
 
   constructor(private readonly webhookService: WebhookService) {}
 
+  /**
+   * GitHub webhook endpoint - rate limited to prevent abuse
+   * Rate limit: configurable via WEBHOOK_RATE_LIMIT env var (default: 1000 req/min)
+   */
   @Post('github')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: RATE_LIMITS.WEBHOOK_RPM, ttl: 60000 } })
   async handleGithubWebhook(
     @Headers('x-github-event') eventType: string,
     @Headers('x-hub-signature-256') signature: string,
@@ -72,8 +79,13 @@ export class WebhookController {
     return { status: 'accepted' };
   }
 
+  /**
+   * Slack webhook endpoint - rate limited to prevent abuse
+   * Rate limit: configurable via WEBHOOK_RATE_LIMIT env var (default: 1000 req/min)
+   */
   @Post('slack')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: RATE_LIMITS.WEBHOOK_RPM, ttl: 60000 } })
   async handleSlackWebhook(
     @Headers('x-slack-request-timestamp') timestamp: string,
     @Headers('x-slack-signature') signature: string,
@@ -124,8 +136,13 @@ export class WebhookController {
     return { status: 'ok' };
   }
 
+  /**
+   * Jira webhook endpoint - rate limited to prevent abuse
+   * Rate limit: configurable via WEBHOOK_RATE_LIMIT env var (default: 1000 req/min)
+   */
   @Post('jira')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: RATE_LIMITS.WEBHOOK_RPM, ttl: 60000 } })
   async handleJiraWebhook(
     @Headers('x-atlassian-webhook-identifier') identifier: string,
     @Req() req: RawBodyRequest<Request>,
@@ -172,8 +189,13 @@ export class WebhookController {
     return { status: 'accepted' };
   }
 
+  /**
+   * Google Drive webhook endpoint - rate limited to prevent abuse
+   * Rate limit: configurable via WEBHOOK_RATE_LIMIT env var (default: 1000 req/min)
+   */
   @Post('google')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: RATE_LIMITS.WEBHOOK_RPM, ttl: 60000 } })
   async handleGoogleWebhook(
     @Headers('x-goog-channel-id') channelId: string,
     @Headers('x-goog-resource-state') resourceState: string,
