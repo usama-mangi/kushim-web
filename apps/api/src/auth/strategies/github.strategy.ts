@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-github2';
 import { AuthService } from '../auth.service';
+import { GitHubProfile } from '../../types';
+import { User } from '@prisma/client';
 
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
@@ -19,8 +21,8 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
   async validate(
     accessToken: string,
     refreshToken: string,
-    profile: any,
-  ): Promise<any> {
+    profile: GitHubProfile,
+  ): Promise<User> {
     const email = profile.emails[0].value;
     // In a real app, we would also verify or create the user here via AuthService
     // For now, let's assume we map by email or create a new user.

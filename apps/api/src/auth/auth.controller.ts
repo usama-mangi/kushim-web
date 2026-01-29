@@ -9,9 +9,17 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AuthenticatedRequest } from '../types';
+
+interface RegisterDto {
+  email: string;
+  password: string;
+  username?: string;
+}
 
 @Controller('auth')
 export class AuthController {
@@ -20,12 +28,12 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Request() req: any) {
+  async login(@Request() req: AuthenticatedRequest) {
     return this.authService.login(req.user);
   }
 
   @Post('register')
-  async register(@Body() body: any) {
+  async register(@Body() body: RegisterDto) {
     return this.authService.register(body.email, body.password);
   }
 
@@ -42,7 +50,7 @@ export class AuthController {
 
   @Get('github/callback')
   @UseGuards(AuthGuard('github'))
-  async githubLoginCallback(@Request() req: any, @Res() res: any) {
+  async githubLoginCallback(@Request() req: AuthenticatedRequest, @Res() res: Response) {
     const { access_token } = await this.authService.login(req.user);
     // Redirect to frontend with token (securely this should be a cookie or similar, but query param for simplicity here)
     res.redirect(`http://localhost:3000/login?token=${access_token}`);
@@ -56,26 +64,26 @@ export class AuthController {
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
-  async googleLoginCallback(@Request() req: any, @Res() res: any) {
+  async googleLoginCallback(@Request() req: AuthenticatedRequest, @Res() res: Response) {
     const { access_token } = await this.authService.login(req.user);
     res.redirect(`http://localhost:3000/login?token=${access_token}`);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('profile')
-  getProfile(@Request() req: any) {
+  getProfile(@Request() req: AuthenticatedRequest) {
     return req.user;
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('mfa/status')
-  async getMfaStatus(@Request() req: any) {
+  async getMfaStatus(@Request() req: AuthenticatedRequest) {
     return this.authService.getMfaStatus(req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('mfa/generate')
-  async generateMfa(@Request() req: any) {
+  async generateMfa(@Request() req: AuthenticatedRequest) {
     return this.auditMfaGeneration(req.user.userId);
   }
 
@@ -87,7 +95,7 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(JwtAuthGuard)
   @Post('mfa/verify')
-  async verifyMfa(@Request() req: any, @Body() body: { token: string }) {
+  async verifyMfa(@Request() req: AuthenticatedRequest, @Body() body: { token: string }) {
     return this.authService.verifyMfaToken(req.user.userId, body.token);
   }
 

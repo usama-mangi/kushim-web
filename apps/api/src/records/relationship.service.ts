@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UnifiedRecord } from '@prisma/client';
+import { UnifiedRecord, Prisma } from '@prisma/client';
 import { MLScoringService } from './ml-scoring.service';
 import { GraphService } from './graph.service';
 import { TfIdfService } from '../common/tfidf.service';
 import { RedisService } from '../common/redis.service';
 import { TracingService } from '../common/tracing.service';
+import { LinkExplanation } from '../types';
 
 @Injectable()
 export class RelationshipService {
@@ -202,7 +203,7 @@ export class RelationshipService {
     );
   }
 
-  private async calculateLinkScoreOptimized(a: UnifiedRecord, b: any): Promise<number> {
+  private async calculateLinkScoreOptimized(a: UnifiedRecord, b: UnifiedRecord): Promise<number> {
     let score = 0;
 
     // Use graph-based signal calculation for better performance
@@ -326,7 +327,7 @@ export class RelationshipService {
     b: UnifiedRecord,
     score: number,
     discoveryMethod: string = 'deterministic',
-    explanation: any = {},
+    explanation: LinkExplanation,
   ) {
     return await this.createLinkWithTransaction(
       this.prisma,
@@ -339,12 +340,12 @@ export class RelationshipService {
   }
 
   private async createLinkWithTransaction(
-    tx: any, // PrismaClient or TransactionClient
+    tx: Prisma.TransactionClient
     a: UnifiedRecord,
     b: UnifiedRecord,
     score: number,
     discoveryMethod: string = 'deterministic',
-    explanation: any = {},
+    explanation: LinkExplanation,
   ) {
     const [sourceId, targetId] =
       a.timestamp < b.timestamp ? [a.id, b.id] : [b.id, a.id];

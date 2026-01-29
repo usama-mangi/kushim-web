@@ -27,7 +27,7 @@ export class RecordsController {
   @UseGuards(JwtAuthGuard)
   @Get('context-groups')
   findContextGroups(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {

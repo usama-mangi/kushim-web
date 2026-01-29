@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, UseGuards, Param, Request, Body, HttpCode, Logger } from '@nestjs/common';
 import { GraphService } from './graph.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Integer } from 'neo4j-driver';
+import { AuthenticatedRequest, toPlainObject } from '../types';
 import { randomUUID } from 'crypto';
 
 @Controller('graph')
@@ -10,43 +10,9 @@ export class GraphController {
   
   constructor(private readonly graphService: GraphService) {}
 
-  private toPlainObject(obj: any): any {
-    if (obj === null || obj === undefined) {
-      return obj;
-    }
-    
-    // Handle Neo4j Integer
-    if (obj instanceof Integer || (obj && typeof obj === 'object' && 'low' in obj && 'high' in obj)) {
-      return typeof obj.toNumber === 'function' ? obj.toNumber() : Number(obj.low);
-    }
-    
-    // Handle Neo4j DateTime and other temporal types
-    if (obj && typeof obj === 'object' && 'toString' in obj && typeof obj.toString === 'function' && obj.constructor && obj.constructor.name && obj.constructor.name.includes('DateTime')) {
-      return obj.toString();
-    }
-    
-    // Handle arrays
-    if (Array.isArray(obj)) {
-      return obj.map(item => this.toPlainObject(item));
-    }
-    
-    // Handle objects
-    if (typeof obj === 'object') {
-      const plain: any = {};
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          plain[key] = this.toPlainObject(obj[key]);
-        }
-      }
-      return plain;
-    }
-    
-    return obj;
-  }
-
   @UseGuards(JwtAuthGuard)
   @Get('context-groups')
-  async getContextGroups(@Request() req: any) {
+  async getContextGroups(@Request() req: AuthenticatedRequest) {
     const cypher = `
       MATCH (g:ContextGroup)
       OPTIONAL MATCH (g)<-[:BELONGS_TO]-(a:Artifact)
@@ -80,7 +46,7 @@ export class GraphController {
 
   @UseGuards(JwtAuthGuard)
   @Get('context-groups/:id/graph')
-  async getContextGroupGraph(@Param('id') groupId: string, @Request() req: any) {
+  async getContextGroupGraph(@Param('id') groupId: string, @Request() req: AuthenticatedRequest) {
     const cypher = `
       MATCH (g:ContextGroup {id: $groupId})<-[:BELONGS_TO]-(a:Artifact)
       WHERE a.userId = $userId
@@ -134,7 +100,7 @@ export class GraphController {
 
   @UseGuards(JwtAuthGuard)
   @Get('full')
-  async getFullGraph(@Request() req: any) {
+  async getFullGraph(@Request() req: AuthenticatedRequest) {
     const cypher = `
       MATCH (a:Artifact)
       WHERE a.userId = $userId
@@ -185,7 +151,7 @@ export class GraphController {
   @UseGuards(JwtAuthGuard)
   @Post('context-groups')
   async createContextGroup(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() body: { name: string; artifactIds?: string[] }
   ) {
     this.logger.log(`Creating context group: ${body.name} for user ${req.user.userId}`);
@@ -232,7 +198,7 @@ export class GraphController {
   async updateContextGroup(
     @Param('id') groupId: string,
     @Body() body: { name?: string },
-    @Request() req: any
+    @Request() req: AuthenticatedRequest
   ) {
     if (body.name) {
       await this.graphService.renameContextGroup(groupId, body.name, req.user.userId);
@@ -245,7 +211,7 @@ export class GraphController {
   @HttpCode(204)
   async deleteContextGroup(
     @Param('id') groupId: string,
-    @Request() req: any
+    @Request() req: AuthenticatedRequest
   ) {
     await this.graphService.deleteContextGroup(groupId, req.user.userId);
   }
@@ -255,7 +221,7 @@ export class GraphController {
   async addArtifactToGroup(
     @Param('id') groupId: string,
     @Body() body: { artifactId: string },
-    @Request() req: any
+    @Request() req: AuthenticatedRequest
   ) {
     if (!body.artifactId) {
       return { success: false, message: 'Artifact ID is required' };
@@ -279,7 +245,7 @@ export class GraphController {
   async removeArtifactFromGroup(
     @Param('id') groupId: string,
     @Param('artifactId') artifactId: string,
-    @Request() req: any
+    @Request() req: AuthenticatedRequest
   ) {
     this.logger.log(`Removing artifact ${artifactId} from group ${groupId}`);
     
@@ -297,7 +263,7 @@ export class GraphController {
   async mergeGroups(
     @Param('id') targetGroupId: string,
     @Body() body: { sourceGroupId: string },
-    @Request() req: any
+    @Request() req: AuthenticatedRequest
   ) {
     if (!body.sourceGroupId) {
       return { success: false, message: 'Source group ID is required' };

@@ -4,6 +4,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UnifiedRecord, Link } from '@prisma/client';
 import { RedisService } from '../common/redis.service';
 import neo4j from 'neo4j-driver';
+import { 
+  ArtifactNodeProperties, 
+  extractNodeProperties,
+  toPlainObject as toPlainNeo4jObject 
+} from '../types';
 
 @Injectable()
 export class GraphService {
@@ -462,18 +467,21 @@ export class GraphService {
     return newGroupIds;
   }
 
-  private clusterArtifacts(connectivityData: any[]): string[][] {
+  private clusterArtifacts(connectivityData: neo4j.Record[]): string[][] {
     // Simple greedy clustering based on connectivity
     const visited = new Set<string>();
     const clusters: string[][] = [];
     
     for (const row of connectivityData) {
-      const artifactId = row.get('artifactId');
+      const artifactId = row.get('artifactId') as string;
       
       if (visited.has(artifactId)) continue;
       
-      const connected = row.get('connected') || [];
-      const cluster = [artifactId, ...connected.map((a: any) => a.properties?.id).filter(Boolean)];
+      const connected = row.get('connected') as neo4j.Node[] || [];
+      const cluster = [
+        artifactId, 
+        ...connected.map((a) => extractNodeProperties<ArtifactNodeProperties>(a).id).filter(Boolean)
+      ];
       
       // Mark all as visited
       cluster.forEach(id => visited.add(id));
@@ -575,7 +583,7 @@ export class GraphService {
         topics: groupProps.topics || [],
         status: groupProps.status || 'active',
         memberCount: r.get('members').length,
-        members: r.get('members').map((m: any) => ({
+        members: r.get('members').map((m: neo4j.Node) => ({
           weight: m.rel?.properties.weight || 1.0,
           record: {
             id: m.node.properties.id,
