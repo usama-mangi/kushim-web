@@ -25,7 +25,7 @@ describe('WebhookService', () => {
         {
           provide: PrismaService,
           useValue: {
-            platformConnection: {
+            dataSource: {
               findFirst: jest.fn(),
             },
           },
@@ -60,9 +60,10 @@ describe('WebhookService', () => {
     it('should reject invalid GitHub signature', () => {
       process.env.GITHUB_WEBHOOK_SECRET = 'test-secret';
       const payload = JSON.stringify({ test: 'data' });
-      const signature = 'sha256=invalid';
+      // Create a valid format but wrong signature
+      const wrongSignature = 'sha256=' + 'a'.repeat(64); // Valid hex length but wrong value
 
-      const result = service.verifyGithubSignature(payload, signature);
+      const result = service.verifyGithubSignature(payload, wrongSignature);
       expect(result).toBe(false);
     });
 
@@ -135,9 +136,11 @@ describe('WebhookService', () => {
   describe('getUserIdForPlatformResource', () => {
     it('should return userId for matching platform connection', async () => {
       const userId = 'user-123';
+      const mockDataSource = { userId };
+      
       jest
-        .spyOn(prismaService.platformConnection, 'findFirst')
-        .mockResolvedValue({ userId } as any);
+        .spyOn(prismaService.dataSource, 'findFirst')
+        .mockResolvedValue(mockDataSource as any);
 
       const result = await service.getUserIdForPlatformResource(
         'github',
@@ -145,9 +148,27 @@ describe('WebhookService', () => {
       );
 
       expect(result).toBe(userId);
+      expect(prismaService.dataSource.findFirst).toHaveBeenCalledWith({
+        where: {
+          providerName: 'github',
+        },
+        select: { userId: true },
+      });
     });
 
     it('should return null when no connection found', async () => {
+      jest
+        .spyOn(prismaService.dataSource, 'findFirst')
+        .mockResolvedValue(null);
+
+      const result = await service.getUserIdForPlatformResource(
+        'github',
+        'resource-123',
+      );
+
+      expect(result).toBeNull();
+    });
+  });
       jest
         .spyOn(prismaService.platformConnection, 'findFirst')
         .mockResolvedValue(null);

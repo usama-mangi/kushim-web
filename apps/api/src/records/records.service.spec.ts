@@ -44,7 +44,7 @@ describe('RecordsService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all records for a user', async () => {
+    it('should return all records with pagination', async () => {
       const mockRecords = [
         {
           id: '1',
@@ -63,19 +63,72 @@ describe('RecordsService', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           metadata: {},
+          source: {
+            providerName: 'github',
+            status: 'active',
+          },
         },
       ];
 
       prisma.unifiedRecord.findMany.mockResolvedValue(mockRecords);
+      prisma.unifiedRecord.count.mockResolvedValue(1);
 
-      const result = await service.findAll('user-1');
+      const result = await service.findAll({ limit: 100, offset: 0 });
 
-      expect(result).toEqual(mockRecords);
+      expect(result).toEqual({
+        records: mockRecords,
+        pagination: {
+          total: 1,
+          limit: 100,
+          offset: 0,
+          hasMore: false,
+        },
+      });
       expect(prisma.unifiedRecord.findMany).toHaveBeenCalledWith({
-        where: { userId: 'user-1' },
+        where: {},
         orderBy: { timestamp: 'desc' },
         take: 100,
+        skip: 0,
+        include: {
+          source: {
+            select: {
+              providerName: true,
+              status: true,
+            },
+          },
+        },
       });
+    });
+
+    it('should filter by source platform', async () => {
+      prisma.unifiedRecord.findMany.mockResolvedValue([]);
+      prisma.unifiedRecord.count.mockResolvedValue(0);
+
+      await service.findAll({ source: 'github' });
+
+      expect(prisma.unifiedRecord.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { sourcePlatform: 'github' },
+        }),
+      );
+    });
+
+    it('should filter by search query', async () => {
+      prisma.unifiedRecord.findMany.mockResolvedValue([]);
+      prisma.unifiedRecord.count.mockResolvedValue(0);
+
+      await service.findAll({ search: 'test query' });
+
+      expect(prisma.unifiedRecord.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { title: { contains: 'test query', mode: 'insensitive' } },
+              { body: { contains: 'test query', mode: 'insensitive' } },
+            ],
+          },
+        }),
+      );
     });
   });
 });

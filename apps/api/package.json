@@ -110,7 +110,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(octokit|@slack/web-api|jira.js|googleapis)/)"
+      "node_modules/(?!(octokit|@slack/web-api|jira.js|googleapis|@xenova)/)"
     ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
