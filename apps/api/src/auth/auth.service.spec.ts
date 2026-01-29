@@ -70,7 +70,6 @@ describe('AuthService', () => {
       expect(result.id).toBe(mockUser.id);
       expect(result.email).toBe(mockUser.email);
     });
-    });
 
     it('should return null if user not found', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
