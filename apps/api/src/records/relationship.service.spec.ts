@@ -74,12 +74,16 @@ describe('RelationshipService', () => {
           provide: MLScoringService,
           useValue: {
             runShadowScoring: jest.fn(),
+            calculateMLScore: jest.fn().mockResolvedValue({
+              score: 0.5,
+              explanation: {},
+            }),
           },
         },
         {
           provide: GraphService,
           useValue: {
-            findLinkingCandidates: jest.fn(),
+            findLinkingCandidateIds: jest.fn(),
             findLinkingCandidateIds: jest.fn().mockResolvedValue([]),
             hydrateRecordsFromIds: jest.fn().mockResolvedValue([]),
             calculateGraphSignals: jest.fn().mockReturnValue({ graphScore: 0, pathExists: false }),
@@ -133,11 +137,12 @@ describe('RelationshipService', () => {
   describe('discoverRelationships', () => {
     it('should use graph-based candidate discovery', async () => {
       const record = mockRecord();
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue([]);
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([]);
 
       await service.discoverRelationships(record);
 
-      expect(graphService.findLinkingCandidates).toHaveBeenCalledWith(
+      expect(graphService.findLinkingCandidateIds).toHaveBeenCalledWith(
         record.id,
         record.userId,
         100
@@ -154,7 +159,8 @@ describe('RelationshipService', () => {
         url: 'https://github.com/org/repo/pull/456',
       });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: true,
         hasUrlReference: false,
@@ -165,7 +171,7 @@ describe('RelationshipService', () => {
       jest.spyOn(graphService, 'getRecordGroups').mockResolvedValue([]);
       jest.spyOn(graphService, 'createContextGroup').mockResolvedValue('group-1');
       
-      const linkUpsertSpy = jest.spyOn(prismaService.link, 'upsert').mockResolvedValue({
+      const linkUpsertSpy = jest.spyOn(prismaService.recordLink, 'upsert').mockResolvedValue({
         id: 'link-1',
         sourceRecordId: record.id,
         targetRecordId: candidate.id,
@@ -190,7 +196,8 @@ describe('RelationshipService', () => {
         body: 'About database performance',
       });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: false,
         hasUrlReference: false,
@@ -199,7 +206,7 @@ describe('RelationshipService', () => {
       });
       jest.spyOn(tfidfService, 'calculateSimilarity').mockReturnValue(0.1);
       
-      const linkUpsertSpy = jest.spyOn(prismaService.link, 'upsert');
+      const linkUpsertSpy = jest.spyOn(prismaService.recordLink, 'upsert');
 
       await service.discoverRelationships(record);
 
@@ -213,7 +220,7 @@ describe('RelationshipService', () => {
         mockRecord({ id: 'record-3' }),
       ];
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue(candidates);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(candidates);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: false,
         hasUrlReference: false,
@@ -237,7 +244,8 @@ describe('RelationshipService', () => {
         body: 'Addresses ticket JIRA-123',
       });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: true,
         hasUrlReference: false,
@@ -248,7 +256,7 @@ describe('RelationshipService', () => {
       jest.spyOn(graphService, 'getRecordGroups').mockResolvedValue([]);
       jest.spyOn(graphService, 'createContextGroup').mockResolvedValue('group-1');
 
-      const linkUpsertSpy = jest.spyOn(prismaService.link, 'upsert').mockResolvedValue({
+      const linkUpsertSpy = jest.spyOn(prismaService.recordLink, 'upsert').mockResolvedValue({
         id: 'link-1',
         sourceRecordId: record.id,
         targetRecordId: candidate.id,
@@ -273,7 +281,8 @@ describe('RelationshipService', () => {
         body: 'See https://github.com/org/repo/issues/123 for details',
       });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: false,
         hasUrlReference: true,
@@ -294,7 +303,8 @@ describe('RelationshipService', () => {
         metadata: { branch: 'feature/auth', repository: 'org/repo' },
       });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: false,
         hasUrlReference: false,
@@ -311,7 +321,8 @@ describe('RelationshipService', () => {
       const record = mockRecord();
       const candidate = mockRecord({ id: 'record-2' });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: false,
         hasUrlReference: false,
@@ -328,7 +339,8 @@ describe('RelationshipService', () => {
       const record = mockRecord({ author: 'john' });
       const candidate = mockRecord({ id: 'record-2', author: 'john' });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: false,
         hasUrlReference: false,
@@ -348,7 +360,8 @@ describe('RelationshipService', () => {
       const record = mockRecord({ timestamp: now });
       const candidate = mockRecord({ id: 'record-2', timestamp: oneHourAgo });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: false,
         hasUrlReference: false,
@@ -376,7 +389,8 @@ describe('RelationshipService', () => {
         metadata: { branch: 'feature/auth' }
       });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: true, // 0.7
         hasUrlReference: false,
@@ -387,7 +401,7 @@ describe('RelationshipService', () => {
       jest.spyOn(graphService, 'getRecordGroups').mockResolvedValue([]);
       jest.spyOn(graphService, 'createContextGroup').mockResolvedValue('group-1');
 
-      const linkUpsertSpy = jest.spyOn(prismaService.link, 'upsert').mockResolvedValue({
+      const linkUpsertSpy = jest.spyOn(prismaService.recordLink, 'upsert').mockResolvedValue({
         id: 'link-1',
         sourceRecordId: record.id,
         targetRecordId: candidate.id,
@@ -412,7 +426,8 @@ describe('RelationshipService', () => {
       const record = mockRecord({ body: '' });
       const candidate = mockRecord({ id: 'record-2', body: '' });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: false,
         hasUrlReference: false,
@@ -432,7 +447,8 @@ describe('RelationshipService', () => {
         title: 'Fix PROJ-123!',
       });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: true,
         hasUrlReference: false,
@@ -442,7 +458,7 @@ describe('RelationshipService', () => {
       jest.spyOn(tfidfService, 'calculateSimilarity').mockReturnValue(0.3);
       jest.spyOn(graphService, 'getRecordGroups').mockResolvedValue([]);
       jest.spyOn(graphService, 'createContextGroup').mockResolvedValue('group-1');
-      jest.spyOn(prismaService.link, 'upsert').mockResolvedValue({
+      jest.spyOn(prismaService.recordLink, 'upsert').mockResolvedValue({
         id: 'link-1',
         sourceRecordId: record.id,
         targetRecordId: candidate.id,
@@ -463,7 +479,8 @@ describe('RelationshipService', () => {
         metadata: undefined as any,
       });
 
-      jest.spyOn(graphService, 'findLinkingCandidates').mockResolvedValue([candidate]);
+      jest.spyOn(graphService, 'findLinkingCandidateIds').mockResolvedValue(['record-2'])
+      jest.spyOn(graphService, 'hydrateRecordsFromIds').mockResolvedValue([candidate]);
       jest.spyOn(graphService, 'calculateGraphSignals').mockResolvedValue({
         hasIdMatch: false,
         hasUrlReference: false,
@@ -489,7 +506,7 @@ describe('RelationshipService', () => {
       jest.spyOn(graphService, 'getRecordGroups').mockResolvedValue([]);
       jest.spyOn(graphService, 'createContextGroup').mockResolvedValue('group-1');
 
-      const linkUpsertSpy = jest.spyOn(prismaService.link, 'upsert').mockResolvedValue({
+      const linkUpsertSpy = jest.spyOn(prismaService.recordLink, 'upsert').mockResolvedValue({
         id: 'link-1',
         sourceRecordId: recordA.id,
         targetRecordId: recordB.id,
