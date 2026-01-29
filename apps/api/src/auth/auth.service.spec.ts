@@ -49,12 +49,15 @@ describe('AuthService', () => {
       const mockUser = {
         id: '1',
         email: 'test@example.com',
-        username: 'testuser',
         passwordHash: 'hashed_password',
+        roleId: 'role-1',
         createdAt: new Date(),
         updatedAt: new Date(),
-        totpSecret: null,
-        mfaEnabled: false,
+        role: {
+          id: 'role-1',
+          name: 'USER',
+          createdAt: new Date(),
+        },
       };
 
       prisma.user.findUnique.mockResolvedValue(mockUser);
@@ -62,11 +65,11 @@ describe('AuthService', () => {
 
       const result = await service.validateUser('test@example.com', 'password');
 
-      expect(result).toEqual({
-        id: mockUser.id,
-        email: mockUser.email,
-        username: mockUser.username,
-      });
+      // Should exclude passwordHash
+      expect(result).not.toHaveProperty('passwordHash');
+      expect(result.id).toBe(mockUser.id);
+      expect(result.email).toBe(mockUser.email);
+    });
     });
 
     it('should return null if user not found', async () => {
@@ -99,22 +102,51 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('should return JWT token', async () => {
+    it('should return JWT token for users without MFA', async () => {
       const user = {
         id: '1',
         email: 'test@example.com',
-        username: 'testuser',
+        mfaEnabled: false,
+        role: {
+          id: 'role-1',
+          name: 'USER',
+        },
       };
 
       const result = await service.login(user);
 
       expect(result).toHaveProperty('access_token');
+      expect(result).toHaveProperty('user');
       expect(result.access_token).toBe('mock_token');
-      expect(jwtService.sign).toHaveBeenCalledWith({
-        userId: user.id,
+      expect(result.user).toEqual({
+        id: user.id,
         email: user.email,
-        username: user.username,
+        mfaEnabled: false,
       });
+      expect(jwtService.sign).toHaveBeenCalledWith({
+        email: user.email,
+        sub: user.id,
+        role: 'USER',
+      });
+    });
+
+    it('should return temp token for users with MFA enabled', async () => {
+      const user = {
+        id: '1',
+        email: 'test@example.com',
+        mfaEnabled: true,
+      };
+
+      const result = await service.login(user);
+
+      expect(result).toHaveProperty('mfaRequired');
+      expect(result).toHaveProperty('temp_token');
+      expect(result.mfaRequired).toBe(true);
+      expect(result.temp_token).toBe('mock_token');
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        { sub: user.id, isMfaTemp: true },
+        { expiresIn: '5m' }
+      );
     });
   });
 });

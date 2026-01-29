@@ -1,14 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GraphService } from './graph.service';
 import { Neo4jService } from '../neo4j/neo4j.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../common/redis.service';
+import { createMockPrismaService, createMockRedisService } from '../../test/utils';
 
 describe('GraphService - Context Groups', () => {
   let service: GraphService;
   let neo4jService: Neo4jService;
+  let prisma: ReturnType<typeof createMockPrismaService>;
+  let redis: ReturnType<typeof createMockRedisService>;
 
   const mockNeo4jRun = jest.fn();
 
   beforeEach(async () => {
+    prisma = createMockPrismaService();
+    redis = createMockRedisService();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GraphService,
@@ -17,6 +25,14 @@ describe('GraphService - Context Groups', () => {
           useValue: {
             run: mockNeo4jRun,
           },
+        },
+        {
+          provide: PrismaService,
+          useValue: prisma,
+        },
+        {
+          provide: RedisService,
+          useValue: redis,
         },
       ],
     }).compile();
