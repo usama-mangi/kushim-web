@@ -340,7 +340,7 @@ export class RelationshipService {
   }
 
   private async createLinkWithTransaction(
-    tx: Prisma.TransactionClient
+    tx: Prisma.TransactionClient,
     a: UnifiedRecord,
     b: UnifiedRecord,
     score: number,
