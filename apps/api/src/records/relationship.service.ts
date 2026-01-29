@@ -7,16 +7,17 @@ import { TfIdfService } from '../common/tfidf.service';
 import { RedisService } from '../common/redis.service';
 import { TracingService } from '../common/tracing.service';
 import { LinkExplanation } from '../types';
+import { ML_CONFIG, PAGINATION } from '../common/constants';
 
 @Injectable()
 export class RelationshipService {
   private readonly logger = new Logger(RelationshipService.name);
 
-  // ML Specs Phase 3: Production thresholds
-  private readonly DETERMINISTIC_THRESHOLD = 0.7;
-  private readonly ML_THRESHOLD = 0.75; // Higher threshold for ML-only links (precision first)
-  private readonly ML_SHADOW_MODE: boolean;
-  private readonly ML_ENABLED: boolean;
+  // ML Specs Phase 3: Production thresholds (can be overridden via env vars)
+  private readonly DETERMINISTIC_THRESHOLD = ML_CONFIG.DETERMINISTIC_THRESHOLD;
+  private readonly ML_THRESHOLD = ML_CONFIG.THRESHOLD;
+  private readonly ML_SHADOW_MODE = ML_CONFIG.SHADOW_MODE;
+  private readonly ML_ENABLED = ML_CONFIG.ENABLED;
 
   constructor(
     private prisma: PrismaService,
@@ -26,11 +27,7 @@ export class RelationshipService {
     private redisService: RedisService,
     private tracingService: TracingService,
   ) {
-    // ML_SHADOW_MODE: true = log ML predictions but don't create links
-    // ML_SHADOW_MODE: false = create links based on ML predictions
-    this.ML_SHADOW_MODE = process.env.ML_SHADOW_MODE !== 'false';
-    this.ML_ENABLED = process.env.ML_ENABLED === 'true';
-    
+    // Log ML configuration
     if (this.ML_SHADOW_MODE) {
       this.logger.log('ML Shadow Mode: ENABLED - ML predictions will be logged but not actioned');
     } else if (this.ML_ENABLED) {
@@ -62,7 +59,7 @@ export class RelationshipService {
           const candidateIds = await this.graphService.findLinkingCandidateIds(
             newRecord.id,
             newRecord.userId,
-            100
+            PAGINATION.MAX_LINKING_CANDIDATES
           );
 
           const candidates = await this.graphService.hydrateRecordsFromIds(candidateIds);

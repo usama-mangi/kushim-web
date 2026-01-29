@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { GraphService } from './graph.service';
+import { PAGINATION } from '../common/constants';
 
 @Injectable()
 export class RecordsService {
@@ -19,7 +20,13 @@ export class RecordsService {
       offset?: number;
     } = {},
   ) {
-    const { search, source, type, limit = 100, offset = 0 } = params;
+    const { 
+      search, 
+      source, 
+      type, 
+      limit = PAGINATION.DEFAULT_PAGE_SIZE, 
+      offset = PAGINATION.DEFAULT_OFFSET 
+    } = params;
     const where: Prisma.UnifiedRecordWhereInput = {};
 
     if (source) {
@@ -42,7 +49,7 @@ export class RecordsService {
       this.prisma.unifiedRecord.findMany({
         where,
         orderBy: { timestamp: 'desc' },
-        take: Math.min(limit, 100), // Cap at 100 for performance
+        take: Math.min(limit, PAGINATION.MAX_PAGE_SIZE), // Cap at max for performance
         skip: offset,
         include: {
           source: {

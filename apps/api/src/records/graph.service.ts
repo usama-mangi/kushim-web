@@ -3,6 +3,7 @@ import { Neo4jService } from '../neo4j/neo4j.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UnifiedRecord, Link } from '@prisma/client';
 import { RedisService } from '../common/redis.service';
+import { PAGINATION } from '../common/constants';
 import neo4j from 'neo4j-driver';
 import { 
   ArtifactNodeProperties, 
@@ -551,7 +552,10 @@ export class GraphService {
   }
 
   async getContextGroups(userId: string, options: { limit?: number; offset?: number } = {}) {
-    const { limit = 50, offset = 0 } = options;
+    const { 
+      limit = PAGINATION.CONTEXT_GROUP_PAGE_SIZE, 
+      offset = PAGINATION.DEFAULT_OFFSET 
+    } = options;
     
     const cypher = `
       MATCH (g:ContextGroup)
@@ -602,7 +606,7 @@ export class GraphService {
     });
   }
 
-  async findLinkingCandidates(recordId: string, userId: string, maxCandidates: number = 100): Promise<any[]> {
+  async findLinkingCandidates(recordId: string, userId: string, maxCandidates: number = PAGINATION.MAX_LINKING_CANDIDATES): Promise<any[]> {
     const cypher = `
       MATCH (target:Artifact {id: $recordId})
       MATCH (candidate:Artifact)
@@ -646,7 +650,7 @@ export class GraphService {
    * Hybrid fetch approach: Get candidate IDs from Neo4j, then hydrate with full records from PostgreSQL
    * This ensures embeddings are available for ML scoring
    */
-  async findLinkingCandidateIds(recordId: string, userId: string, maxCandidates: number = 100): Promise<string[]> {
+  async findLinkingCandidateIds(recordId: string, userId: string, maxCandidates: number = PAGINATION.MAX_LINKING_CANDIDATES): Promise<string[]> {
     const cypher = `
       MATCH (target:Artifact {id: $recordId})
       MATCH (candidate:Artifact)
@@ -760,7 +764,7 @@ export class GraphService {
    * Reconciliation job to fix PostgreSQL-Neo4j sync inconsistencies
    * Should be run periodically (e.g., daily) or triggered by monitoring alerts
    */
-  async reconcileSyncFailures(limit: number = 100): Promise<number> {
+  async reconcileSyncFailures(limit: number = PAGINATION.SYNC_RECONCILIATION_LIMIT): Promise<number> {
     this.logger.log('Starting Neo4j sync reconciliation...');
     
     // Get failed sync operations from activity logs
