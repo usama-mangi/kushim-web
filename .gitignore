@@ -32,3 +32,10 @@ Thumbs.db
 .turbo/
 .github
 coverage/
+
+# Backup files
+*.backup
+*.bak
+*.orig
+*.old
+*~
