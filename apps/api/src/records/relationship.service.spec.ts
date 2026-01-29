@@ -4,7 +4,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MLScoringService } from './ml-scoring.service';
 import { GraphService } from './graph.service';
 import { TfIdfService } from '../common/tfidf.service';
+import { RedisService } from '../common/redis.service';
+import { TracingService } from '../common/tracing.service';
 import { UnifiedRecord } from '@prisma/client';
+import { createMockRedisService } from '../../test/utils';
+
+// Mock @xenova/transformers to avoid ES module issues
+jest.mock('@xenova/transformers', () => ({
+  pipeline: jest.fn().mockResolvedValue(
+    jest.fn().mockResolvedValue({
+      data: new Float32Array(384).fill(0.1),
+    })
+  ),
+}));
 
 describe('RelationshipService', () => {
   let service: RelationshipService;
@@ -12,6 +24,7 @@ describe('RelationshipService', () => {
   let graphService: GraphService;
   let mlScoringService: MLScoringService;
   let tfidfService: TfIdfService;
+  let redis: ReturnType<typeof createMockRedisService>;
 
   const mockRecord = (overrides: Partial<UnifiedRecord> = {}): UnifiedRecord => ({
     id: 'record-1',
@@ -28,10 +41,14 @@ describe('RelationshipService', () => {
     participants: ['john', 'jane'],
     metadata: { repository: 'org/repo', number: 123 },
     checksum: 'abc123',
+    createdAt: new Date(),
+    updatedAt: new Date(),
     ...overrides,
   });
 
   beforeEach(async () => {
+    redis = createMockRedisService();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RelationshipService,
@@ -43,9 +60,14 @@ describe('RelationshipService', () => {
               findUnique: jest.fn(),
               findFirst: jest.fn(),
             },
-            link: {
+            recordLink: {
               upsert: jest.fn(),
+              create: jest.fn(),
             },
+            $transaction: jest.fn((callback) => callback({
+              unifiedRecord: { findUnique: jest.fn() },
+              recordLink: { create: jest.fn() },
+            })),
           },
         },
         {
@@ -58,8 +80,11 @@ describe('RelationshipService', () => {
           provide: GraphService,
           useValue: {
             findLinkingCandidates: jest.fn(),
-            calculateGraphSignals: jest.fn(),
+            findLinkingCandidateIds: jest.fn().mockResolvedValue([]),
+            hydrateRecordsFromIds: jest.fn().mockResolvedValue([]),
+            calculateGraphSignals: jest.fn().mockReturnValue({ graphScore: 0, pathExists: false }),
             syncLink: jest.fn(),
+            syncRecord: jest.fn(),
             getRecordGroups: jest.fn(),
             createContextGroup: jest.fn(),
             addToContextGroup: jest.fn(),
@@ -70,6 +95,25 @@ describe('RelationshipService', () => {
           provide: TfIdfService,
           useValue: {
             calculateSimilarity: jest.fn(),
+          },
+        },
+        {
+          provide: RedisService,
+          useValue: redis,
+        },
+        {
+          provide: TracingService,
+          useValue: {
+            trace: jest.fn((name, fn) => fn()),
+            withSpan: jest.fn((name, fn) => {
+              const mockSpan = {
+                setAttribute: jest.fn(),
+                setStatus: jest.fn(),
+                addEvent: jest.fn(),
+                end: jest.fn(),
+              };
+              return fn(mockSpan);
+            }),
           },
         },
       ],

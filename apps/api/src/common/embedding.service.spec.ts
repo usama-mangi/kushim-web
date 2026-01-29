@@ -2,12 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EmbeddingService } from './embedding.service';
 
 // Mock @xenova/transformers
-const mockPipeline = jest.fn().mockReturnValue({
-  data: new Float32Array(384).fill(0.1),
-});
-
 jest.mock('@xenova/transformers', () => ({
-  pipeline: jest.fn().mockResolvedValue(mockPipeline),
+  pipeline: jest.fn().mockResolvedValue(
+    // Return a function that returns the embedding data
+    jest.fn().mockResolvedValue({
+      data: new Float32Array(384).fill(0.1),
+    })
+  ),
 }));
 
 describe('EmbeddingService', () => {

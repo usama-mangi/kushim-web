@@ -20,6 +20,20 @@ export const createMockRedisService = () => {
       return true;
     }),
 
+    // Helper to execute with lock (auto-acquire and release)
+    withLock: jest.fn(async (key: string, fn: () => Promise<any>, ttl: number = 10000) => {
+      const acquired = !locks.has(key);
+      if (!acquired) {
+        throw new Error(`Failed to acquire lock: ${key}`);
+      }
+      locks.set(key, true);
+      try {
+        return await fn();
+      } finally {
+        locks.delete(key);
+      }
+    }),
+
     // Caching methods
     get: jest.fn(async (key: string) => null),
     

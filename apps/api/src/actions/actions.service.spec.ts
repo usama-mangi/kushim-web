@@ -1,3 +1,24 @@
+// Mock ES modules to avoid import errors
+jest.mock('octokit', () => ({
+  Octokit: jest.fn().mockImplementation(() => ({})),
+}));
+jest.mock('@slack/web-api', () => ({
+  WebClient: jest.fn().mockImplementation(() => ({})),
+}));
+jest.mock('jira.js', () => ({
+  Version3Client: jest.fn().mockImplementation(() => ({})),
+}));
+jest.mock('googleapis', () => ({
+  google: {},
+}));
+jest.mock('@xenova/transformers', () => ({
+  pipeline: jest.fn().mockResolvedValue(
+    jest.fn().mockResolvedValue({
+      data: new Float32Array(384).fill(0.1),
+    })
+  ),
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { ActionsService, ActionVerb } from './actions.service';
 import { PrismaService } from '../prisma/prisma.service';
