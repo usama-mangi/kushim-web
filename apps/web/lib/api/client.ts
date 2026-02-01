@@ -8,7 +8,7 @@ class ApiClient {
   private client: AxiosInstance;
 
   constructor() {
-    const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
     this.client = axios.create({
       baseURL,
@@ -36,16 +36,19 @@ class ApiClient {
     // Response interceptor
     this.client.interceptors.response.use(
       (response) => response,
-      (error: AxiosError<ApiError>) => {
+      (error: any) => {
+        // Log raw error for debugging
+        console.error("[ApiClient] Raw API Error:", error);
+
         // Handle errors globally
         const apiError: ApiError = {
-          message: error.response?.data?.message || error.message || "An error occurred",
-          statusCode: error.response?.status || 500,
-          error: error.response?.data?.error,
+          message: error?.response?.data?.message || error?.message || "An error occurred",
+          statusCode: error?.response?.status || 500,
+          error: error?.response?.data?.error,
         };
 
-        // Log error for debugging
-        console.error("API Error:", apiError);
+        // Log constructed error
+        console.error("[ApiClient] Processed ApiError:", apiError);
 
         return Promise.reject(apiError);
       }

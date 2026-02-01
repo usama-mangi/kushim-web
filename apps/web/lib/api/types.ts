@@ -79,12 +79,11 @@ export interface Alert {
 export interface Evidence {
   id: string;
   controlId: string;
+  timestamp: string;
   type: string;
-  timestamp: Date;
-  data: Record<string, any>;
+  source: string;
+  data: any;
   hash: string;
-  previousHash?: string;
-  status: IntegrationStatus;
 }
 
 export interface JiraTask {

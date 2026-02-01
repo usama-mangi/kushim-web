@@ -4,10 +4,13 @@ import { useEffect } from "react";
 import { useDashboardStore } from "@/store/dashboard";
 import { ComplianceScore } from "@/components/dashboard/ComplianceScore";
 import { IntegrationHealth } from "@/components/dashboard/IntegrationHealth";
+import { ControlStatus } from "@/components/dashboard/ControlStatus";
+import { RecentAlerts } from "@/components/dashboard/RecentAlerts";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, AlertCircle } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
+import Link from "next/link";
 
 export default function Home() {
   const {
@@ -52,10 +55,20 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4">
               {lastRefresh && (
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground mr-4">
                   Last updated {formatRelativeTime(lastRefresh)}
                 </span>
               )}
+              <Link href="/integrations">
+                <Button variant="outline" size="sm" className="mr-2">
+                  Integrations
+                </Button>
+              </Link>
+              <Link href="/reports">
+                <Button variant="outline" size="sm" className="mr-2">
+                  Reports
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 size="sm"
@@ -102,13 +115,13 @@ export default function Home() {
           {/* Integration Health Section */}
           <IntegrationHealth />
 
-          {/* Placeholder sections */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="border rounded-lg p-6 h-64 flex items-center justify-center text-muted-foreground">
-              Control Status (Coming Soon)
+          {/* Control Status and Alerts Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <ControlStatus />
             </div>
-            <div className="border rounded-lg p-6 h-64 flex items-center justify-center text-muted-foreground">
-              Recent Alerts (Coming Soon)
+            <div className="lg:col-span-1">
+              <RecentAlerts />
             </div>
           </div>
         </div>

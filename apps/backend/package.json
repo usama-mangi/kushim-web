@@ -73,6 +73,7 @@
     "prettier": "*",
     "source-map-support": "*",
     "supertest": "*",
+    "tailwindcss-animate": "^1.0.7",
     "ts-jest": "*",
     "ts-loader": "*",
     "ts-node": "*",

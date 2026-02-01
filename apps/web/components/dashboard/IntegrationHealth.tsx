@@ -75,16 +75,18 @@ function IntegrationCard({ name, integration, icon }: IntegrationCardProps) {
           </div>
 
           {/* Circuit Breaker Status */}
-          <div className="flex items-center justify-between pt-3 border-t">
-            <span className="text-sm text-muted-foreground">Circuit Breaker</span>
-            <div className="flex items-center gap-2">
-              {getCircuitBreakerIcon(integration.circuitBreaker.state)}
-              <span className="text-sm font-medium">{integration.circuitBreaker.state}</span>
+          {integration.circuitBreaker && (
+            <div className="flex items-center justify-between pt-3 border-t">
+              <span className="text-sm text-muted-foreground">Circuit Breaker</span>
+              <div className="flex items-center gap-2">
+                {getCircuitBreakerIcon(integration.circuitBreaker.state)}
+                <span className="text-sm font-medium">{integration.circuitBreaker.state}</span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Failure Count */}
-          {integration.circuitBreaker.failureCount > 0 && (
+          {integration.circuitBreaker && integration.circuitBreaker.failureCount > 0 && (
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Failures</span>
               <Badge variant="destructive">{integration.circuitBreaker.failureCount}</Badge>
