@@ -1,0 +1,35 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "next": "*",
+    "react": "*",
+    "react-dom": "*",
+    "zustand": "*",
+    "recharts": "*",
+    "react-hook-form": "*",
+    "@hookform/resolvers": "*",
+    "zod": "*",
+    "lucide-react": "*",
+    "date-fns": "*",
+    "axios": "*"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "*",
+    "@types/node": "*",
+    "@types/react": "*",
+    "@types/react-dom": "*",
+    "babel-plugin-react-compiler": "*",
+    "eslint": "*",
+    "eslint-config-next": "*",
+    "tailwindcss": "*",
+    "typescript": "*"
+  }
+}

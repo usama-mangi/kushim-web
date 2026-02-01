@@ -1,0 +1,189 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  plan      Plan     @default(STARTER)
+  status    CustomerStatus @default(ACTIVE)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  integrations      Integration[]
+  complianceChecks  ComplianceCheck[]
+  evidence          Evidence[]
+  jiraTasks         JiraTask[]
+
+  @@map("customers")
+  @@index([email])
+  @@index([status])
+}
+
+enum Plan {
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum CustomerStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELED
+}
+
+model Integration {
+  id           String            @id @default(uuid())
+  customerId   String            @map("customer_id")
+  type         IntegrationType
+  status       IntegrationStatus @default(DISCONNECTED)
+  config       Json              // Encrypted credentials
+  lastSyncAt   DateTime?         @map("last_sync_at")
+  healthScore  Decimal?          @db.Decimal(3, 2) @map("health_score")
+  errorCount   Int               @default(0) @map("error_count")
+  lastError    String?           @map("last_error")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  evidence Evidence[]
+
+  @@map("integrations")
+  @@index([customerId])
+  @@index([type])
+  @@index([status])
+}
+
+enum IntegrationType {
+  AWS
+  GITHUB
+  OKTA
+  JIRA
+  SLACK
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  FAILED
+  DISCONNECTED
+  SYNCING
+}
+
+model Control {
+  id             String   @id @default(uuid())
+  framework      Framework
+  controlId      String   @map("control_id") // e.g., CC6.1, A1.2
+  title          String
+  description    String   @db.Text
+  testProcedure  String   @db.Text @map("test_procedure")
+  frequency      Frequency
+  category       String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  complianceChecks ComplianceCheck[]
+  evidence         Evidence[]
+
+  @@map("controls")
+  @@unique([framework, controlId])
+  @@index([framework])
+}
+
+enum Framework {
+  SOC2
+  ISO27001
+  HIPAA
+  GDPR
+  PCI_DSS
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+model Evidence {
+  id             String   @id @default(uuid())
+  customerId     String   @map("customer_id")
+  controlId      String   @map("control_id")
+  integrationId  String   @map("integration_id")
+  data           Json
+  hash           String   // SHA-256 hash for immutability
+  previousHash   String?  @map("previous_hash")
+  s3Key          String?  @map("s3_key") // For large files
+  collectedAt    DateTime @map("collected_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  control     Control     @relation(fields: [controlId], references: [id])
+  integration Integration @relation(fields: [integrationId], references: [id])
+  complianceChecks ComplianceCheck[]
+
+  @@map("evidence")
+  @@index([customerId])
+  @@index([controlId])
+  @@index([collectedAt])
+  @@index([hash])
+}
+
+model ComplianceCheck {
+  id          String      @id @default(uuid())
+  customerId  String      @map("customer_id")
+  controlId   String      @map("control_id")
+  status      CheckStatus
+  evidenceId  String?     @map("evidence_id")
+  errorMessage String?    @db.Text @map("error_message")
+  checkedAt   DateTime    @map("checked_at")
+  nextCheckAt DateTime?   @map("next_check_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  control  Control   @relation(fields: [controlId], references: [id])
+  evidence Evidence? @relation(fields: [evidenceId], references: [id])
+  jiraTasks JiraTask[]
+
+  @@map("compliance_checks")
+  @@index([customerId])
+  @@index([controlId])
+  @@index([status])
+  @@index([checkedAt])
+}
+
+enum CheckStatus {
+  PASS
+  FAIL
+  WARNING
+  PENDING
+}
+
+model JiraTask {
+  id                 String   @id @default(uuid())
+  customerId         String   @map("customer_id")
+  complianceCheckId  String   @map("compliance_check_id")
+  jiraIssueKey       String   @map("jira_issue_key")
+  jiraIssueId        String   @map("jira_issue_id")
+  status             String
+  syncedAt           DateTime? @map("synced_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  customer        Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  complianceCheck ComplianceCheck @relation(fields: [complianceCheckId], references: [id])
+
+  @@map("jira_tasks")
+  @@unique([jiraIssueKey])
+  @@index([customerId])
+  @@index([complianceCheckId])
+}
