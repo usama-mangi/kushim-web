@@ -1,0 +1,113 @@
+import axios, { AxiosInstance, AxiosError } from "axios";
+import type { ApiError } from "./types";
+
+/**
+ * API Client for Kushim backend
+ */
+class ApiClient {
+  private client: AxiosInstance;
+
+  constructor() {
+    const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+    this.client = axios.create({
+      baseURL,
+      timeout: 30000,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    // Request interceptor
+    this.client.interceptors.request.use(
+      (config) => {
+        // Add auth token if available
+        const token = this.getAuthToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // Response interceptor
+    this.client.interceptors.response.use(
+      (response) => response,
+      (error: AxiosError<ApiError>) => {
+        // Handle errors globally
+        const apiError: ApiError = {
+          message: error.response?.data?.message || error.message || "An error occurred",
+          statusCode: error.response?.status || 500,
+          error: error.response?.data?.error,
+        };
+
+        // Log error for debugging
+        console.error("API Error:", apiError);
+
+        return Promise.reject(apiError);
+      }
+    );
+  }
+
+  /**
+   * Get auth token from storage
+   */
+  private getAuthToken(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("auth_token");
+  }
+
+  /**
+   * Set auth token in storage
+   */
+  public setAuthToken(token: string): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("auth_token", token);
+  }
+
+  /**
+   * Remove auth token from storage
+   */
+  public removeAuthToken(): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem("auth_token");
+  }
+
+  /**
+   * GET request
+   */
+  public async get<T>(url: string, params?: Record<string, any>): Promise<T> {
+    const response = await this.client.get<T>(url, { params });
+    return response.data;
+  }
+
+  /**
+   * POST request
+   */
+  public async post<T>(url: string, data?: Record<string, any>): Promise<T> {
+    const response = await this.client.post<T>(url, data);
+    return response.data;
+  }
+
+  /**
+   * PUT request
+   */
+  public async put<T>(url: string, data?: Record<string, any>): Promise<T> {
+    const response = await this.client.put<T>(url, data);
+    return response.data;
+  }
+
+  /**
+   * DELETE request
+   */
+  public async delete<T>(url: string): Promise<T> {
+    const response = await this.client.delete<T>(url);
+    return response.data;
+  }
+}
+
+// Export singleton instance
+export const apiClient = new ApiClient();
