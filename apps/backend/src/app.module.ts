@@ -10,6 +10,12 @@ import {
 } from './shared/queue/queues.module';
 import { EvidenceCollectionProcessor } from './shared/queue/processors/evidence-collection.processor';
 import { ComplianceCheckProcessor } from './shared/queue/processors/compliance-check.processor';
+import { AwsModule } from './integrations/aws/aws.module';
+import { GitHubModule } from './integrations/github/github.module';
+import { OktaModule } from './integrations/okta/okta.module';
+import { JiraModule } from './integrations/jira/jira.module';
+import { SlackModule } from './integrations/slack/slack.module';
+import { IntegrationReliabilityModule } from './shared/reliability/integration-reliability.module';
 
 @Module({
   imports: [
@@ -21,6 +27,12 @@ import { ComplianceCheckProcessor } from './shared/queue/processors/compliance-c
     QueueModule,
     EvidenceCollectionQueueModule,
     ComplianceCheckQueueModule,
+    AwsModule,
+    GitHubModule,
+    OktaModule,
+    JiraModule,
+    SlackModule,
+    IntegrationReliabilityModule,
   ],
   controllers: [AppController],
   providers: [
