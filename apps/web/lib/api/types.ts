@@ -2,6 +2,23 @@
  * TypeScript interfaces for API responses
  */
 
+export interface User {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  role: "admin" | "user";
+}
+
+export interface LoginResponse {
+  token: string;
+  user: User;
+}
+
+export interface RegisterResponse {
+  token: string;
+  user: User;
+}
 export type IntegrationStatus = "PASS" | "FAIL" | "WARNING" | "PENDING";
 
 export interface CircuitBreakerStatus {

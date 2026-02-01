@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, AlertCircle } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import Link from "next/link";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 
 export default function Home() {
   const {
@@ -78,6 +79,9 @@ export default function Home() {
                 <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
+              <div className="ml-2 pl-2 border-l">
+                 <LogoutButton />
+              </div>
             </div>
           </div>
         </div>

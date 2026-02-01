@@ -16,6 +16,7 @@ import { OktaModule } from './integrations/okta/okta.module';
 import { JiraModule } from './integrations/jira/jira.module';
 import { SlackModule } from './integrations/slack/slack.module';
 import { IntegrationReliabilityModule } from './shared/reliability/integration-reliability.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { IntegrationReliabilityModule } from './shared/reliability/integration-r
     JiraModule,
     SlackModule,
     IntegrationReliabilityModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [

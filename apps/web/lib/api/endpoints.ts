@@ -3,11 +3,30 @@ import type {
   IntegrationHealth,
   OverallHealthResponse,
   EvidenceData,
+  LoginResponse,
+  RegisterResponse,
+  User,
 } from "./types";
 
 /**
  * API endpoint functions
  */
+
+// ============================================================================
+// Authentication
+// ============================================================================
+
+export async function login(data: any): Promise<LoginResponse> {
+  return apiClient.post<LoginResponse>("/auth/login", data);
+}
+
+export async function register(data: any): Promise<RegisterResponse> {
+  return apiClient.post<RegisterResponse>("/auth/register", data);
+}
+
+export async function getMe(): Promise<User> {
+  return apiClient.get<User>("/auth/me");
+}
 
 // ============================================================================
 // Reliability / Overall Health
