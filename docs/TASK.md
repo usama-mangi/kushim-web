@@ -152,10 +152,10 @@
 
 ### Backend Testing
 
-- [ ] Write integration tests for AWS service
-- [ ] Write integration tests for GitHub service
-- [ ] Write integration tests for Okta service
-- [ ] Write integration tests for Jira service
+- [x] Write integration tests for AWS service
+- [x] Write integration tests for GitHub service
+- [x] Write integration tests for Okta service
+- [x] Write integration tests for Jira service
 - [ ] Write unit tests for retry and circuit breaker
 - [ ] Write tests for evidence collection
 - [ ] Write tests for compliance checking
