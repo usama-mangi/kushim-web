@@ -156,9 +156,9 @@
 - [x] Write integration tests for GitHub service
 - [x] Write integration tests for Okta service
 - [x] Write integration tests for Jira service
-- [ ] Write unit tests for retry and circuit breaker
-- [ ] Write tests for evidence collection
-- [ ] Write tests for compliance checking
+- [x] Write unit tests for retry and circuit breaker
+- [x] Write tests for evidence collection
+- [x] Write tests for compliance checking
 
 ### Frontend Testing
 

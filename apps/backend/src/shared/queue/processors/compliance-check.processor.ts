@@ -61,20 +61,27 @@ export class ComplianceCheckProcessor {
         this.logger.warn(`No evidence found for control ${controlId}, triggering collection`);
         
         // Find suitable integration for this control
-        // Simply picking the first active integration for the customer for now. 
-        // In a real app, we'd have a mapping of Control -> IntegrationType
-        // For MVP, assuming AWS for common controls
+        const targetType = control.integrationType || IntegrationType.AWS;
+        
         const integration = await this.prisma.integration.findFirst({
-          where: { customerId, status: 'ACTIVE', type: IntegrationType.AWS },
+          where: { customerId, status: 'ACTIVE', type: targetType },
         });
 
         if (integration) {
-            await this.evidenceQueue.add(EvidenceCollectionJobType.COLLECT_AWS, {
-                customerId, 
-                integrationId: integration.id,
-                controlId: control.id,
-                type: EvidenceCollectionJobType.COLLECT_AWS
-            });
+            const jobType = this.getJobTypeFromIntegration(integration.type);
+            if (jobType) {
+                await this.evidenceQueue.add(jobType, {
+                    customerId, 
+                    integrationId: integration.id,
+                    controlId: control.id,
+                    type: jobType
+                });
+                this.logger.log(`Triggered ${jobType} for control ${control.controlId}`);
+            } else {
+                this.logger.warn(`No job type mapping for integration type ${integration.type}`);
+            }
+        } else {
+            this.logger.warn(`No active ${targetType} integration found for customer ${customerId} to collect evidence for ${control.controlId}`);
         }
         
         return { success: false, message: 'Evidence collection triggered' };
@@ -224,6 +231,16 @@ export class ComplianceCheckProcessor {
         } catch (e) {
             this.logger.error(`Failed to create Jira remediation ticket`, e);
         }
+    }
+  }
+
+  private getJobTypeFromIntegration(type: IntegrationType): EvidenceCollectionJobType | null {
+    switch (type) {
+        case IntegrationType.AWS: return EvidenceCollectionJobType.COLLECT_AWS;
+        case IntegrationType.GITHUB: return EvidenceCollectionJobType.COLLECT_GITHUB;
+        case IntegrationType.OKTA: return EvidenceCollectionJobType.COLLECT_OKTA;
+        // JIRA and SLACK don't have collection jobs yet, or they use different queues
+        default: return null;
     }
   }
 }

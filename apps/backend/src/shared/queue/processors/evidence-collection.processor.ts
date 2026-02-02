@@ -4,6 +4,8 @@ import { Logger } from '@nestjs/common';
 import { QueueName, EvidenceCollectionJobType } from '../queue.constants';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AwsService } from '../../../integrations/aws/aws.service';
+import { GitHubService } from '../../../integrations/github/github.service';
+import { OktaService } from '../../../integrations/okta/okta.service';
 import * as crypto from 'crypto';
 
 interface EvidenceCollectionJobData {
@@ -12,9 +14,6 @@ interface EvidenceCollectionJobData {
   controlId: string;
   type: EvidenceCollectionJobType;
 }
-
-import { GitHubService } from '../../../integrations/github/github.service';
-import { OktaService } from '../../../integrations/okta/okta.service';
 
 @Processor(QueueName.EVIDENCE_COLLECTION)
 export class EvidenceCollectionProcessor {
@@ -33,7 +32,6 @@ export class EvidenceCollectionProcessor {
     this.logger.log(`Processing AWS evidence collection for customer ${customerId}, control ${controlId}`);
     
     try {
-      // 1. Fetch integration and control details
       const integration = await this.prisma.integration.findUnique({
         where: { id: integrationId },
       });
@@ -54,29 +52,17 @@ export class EvidenceCollectionProcessor {
         throw new Error(`Control ${controlId} not found`);
       }
 
-      // 2. Select evidence collection method based on control ID
-      // SOC 2 Mapping:
-      // CC6.1 -> IAM Evidence (MFA)
-      // CC6.7 -> S3 Evidence (Encryption)
-      // CC7.2 -> CloudTrail Evidence (Logging)
-      
       let evidenceData: any;
-
-      // Passing decrypted config (assuming mocked/decrypted here for simplicity, 
-      // in real app we'd decrypt 'integration.config')
       const credentials = integration.config;
 
       switch (control.controlId) {
-        case 'CC6.1': // MFA
-        case 'CC6.1.1': // Access Request
-        case 'CC6.1.2': // MFA (AWS) - wait, this is Okta? No AWS.
-        case 'CC6.1.5': // Privileged Access Review
-          // If the control implies AWS, use AWS. 
-          // Note: CC6.1 is high level. CC6.1.2 is AWS specific in our seed.
+        case 'CC6.1':
+        case 'CC6.1.1':
+        case 'CC6.1.2':
+        case 'CC6.1.5':
           if (control.title.includes('AWS')) {
              evidenceData = await this.awsService.collectIamEvidence(credentials);
           } else {
-             // Fallback to AWS IAM for generic calls if the integration is AWS
              evidenceData = await this.awsService.collectIamEvidence(credentials);
           }
           break;
@@ -87,17 +73,15 @@ export class EvidenceCollectionProcessor {
           evidenceData = await this.awsService.collectS3Evidence(credentials);
           break;
         case 'CC7.2':
-        case 'CC7.2.3': // CloudTrail
-        case 'CC7.2.4': // Centralized Logging
+        case 'CC7.2.3':
+        case 'CC7.2.4':
           evidenceData = await this.awsService.collectCloudTrailEvidence(credentials);
           break;
         default:
-          // Default to IAM for now or log warning
           this.logger.warn(`Unknown mapping for control ${control.controlId} in AWS, defaulting to IAM`);
           evidenceData = await this.awsService.collectIamEvidence(credentials);
       }
 
-      // 3. Store evidence (with automatic S3 offloading for large files)
       const savedEvidence = await this.storeEvidence(
         customerId,
         controlId,
@@ -121,7 +105,6 @@ export class EvidenceCollectionProcessor {
     this.logger.log(`Processing GitHub evidence collection for customer ${customerId}`);
     
     try {
-      // 1. Fetch integration and control details
       const integration = await this.prisma.integration.findUnique({
         where: { id: integrationId },
       });
@@ -138,21 +121,16 @@ export class EvidenceCollectionProcessor {
         throw new Error(`Control ${controlId} not found`);
       }
 
-      // 2. Collect Evidence
-      // SOC 2 Mapping: CC7.2 (Vulnerability Management) -> Branch Protection
       let evidenceData: any;
-      const config = integration.config as any; // { owner, repo, token }
+      const config = integration.config as any;
 
       if (control.controlId === 'CC7.2') {
-          // Assuming we want branch protection for the main branch
-          // In real app, might iterate over all repos
           evidenceData = await this.githubService.collectBranchProtectionEvidence(
               config.owner, 
               config.repo, 
               config.token
           );
       } else {
-          // Default fallback
           evidenceData = await this.githubService.collectBranchProtectionEvidence(
               config.owner, 
               config.repo, 
@@ -160,7 +138,6 @@ export class EvidenceCollectionProcessor {
           );
       }
 
-      // 3. Store evidence
       const savedEvidence = await this.storeEvidence(
         customerId,
         controlId,
@@ -199,20 +176,20 @@ export class EvidenceCollectionProcessor {
         throw new Error(`Control ${controlId} not found`);
       }
 
-      const config = integration.config as any; // { orgUrl, token }
+      const config = integration.config as any;
       let evidenceData: any;
 
       switch (control.controlId) {
         case 'CC6.1':
-        case 'CC6.1.3': // MFA Enforcement (IdP)
+        case 'CC6.1.3':
           evidenceData = await this.oktaService.collectMfaEnforcementEvidence(config);
           break;
         case 'CC6.2':
-        case 'CC6.2.1': // New Hire Provisioning
-        case 'CC6.2.2': // Termination Procedures
+        case 'CC6.2.1':
+        case 'CC6.2.2':
           evidenceData = await this.oktaService.collectUserAccessEvidence(config);
           break;
-        case 'CC6.1.4': // Password Complexity
+        case 'CC6.1.4':
           evidenceData = await this.oktaService.collectPolicyComplianceEvidence(config);
           break;
         default:
@@ -236,8 +213,6 @@ export class EvidenceCollectionProcessor {
     }
   }
 
-
-
   private async storeEvidence(
     customerId: string,
     controlId: string,
@@ -249,7 +224,6 @@ export class EvidenceCollectionProcessor {
     const contentString = JSON.stringify(originalData);
     const contentBuffer = Buffer.from(contentString);
     const sizeInBytes = contentBuffer.length;
-    // Threshold: 100KB
     const MAX_DB_SIZE = 100 * 1024;
 
     let storedData = originalData;
@@ -258,9 +232,6 @@ export class EvidenceCollectionProcessor {
     if (sizeInBytes > MAX_DB_SIZE) {
       const timestamp = now.getTime();
       const key = `evidence/${customerId}/${controlId}/${timestamp}-${jobId}.json`;
-      
-      this.logger.log(`Evidence size ${sizeInBytes} exceeds limit. Offloading to S3: ${key}`);
-      
       const uploadResult = await this.awsService.uploadEvidenceToS3(key, contentBuffer);
       
       if (uploadResult) {
@@ -277,8 +248,6 @@ export class EvidenceCollectionProcessor {
       }
     }
 
-    // Hash the stored data (whether original or reference)
-    // ensuring the DB record itself is immutable
     const contentToHash = JSON.stringify({
       customerId,
       controlId,
