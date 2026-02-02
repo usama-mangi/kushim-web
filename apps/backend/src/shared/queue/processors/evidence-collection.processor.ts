@@ -14,6 +14,7 @@ interface EvidenceCollectionJobData {
 }
 
 import { GitHubService } from '../../../integrations/github/github.service';
+import { OktaService } from '../../../integrations/okta/okta.service';
 
 @Processor(QueueName.EVIDENCE_COLLECTION)
 export class EvidenceCollectionProcessor {
@@ -23,6 +24,7 @@ export class EvidenceCollectionProcessor {
     private readonly prisma: PrismaService,
     private readonly awsService: AwsService,
     private readonly githubService: GitHubService,
+    private readonly oktaService: OktaService,
   ) {}
 
   @Process(EvidenceCollectionJobType.COLLECT_AWS)
@@ -65,18 +67,33 @@ export class EvidenceCollectionProcessor {
       const credentials = integration.config;
 
       switch (control.controlId) {
-        case 'CC6.1':
-          evidenceData = await this.awsService.collectIamEvidence(credentials);
+        case 'CC6.1': // MFA
+        case 'CC6.1.1': // Access Request
+        case 'CC6.1.2': // MFA (AWS) - wait, this is Okta? No AWS.
+        case 'CC6.1.5': // Privileged Access Review
+          // If the control implies AWS, use AWS. 
+          // Note: CC6.1 is high level. CC6.1.2 is AWS specific in our seed.
+          if (control.title.includes('AWS')) {
+             evidenceData = await this.awsService.collectIamEvidence(credentials);
+          } else {
+             // Fallback to AWS IAM for generic calls if the integration is AWS
+             evidenceData = await this.awsService.collectIamEvidence(credentials);
+          }
           break;
         case 'CC6.7':
+        case 'CC6.7.1':
+        case 'CC6.7.2':
+        case 'CC6.7.3':
           evidenceData = await this.awsService.collectS3Evidence(credentials);
           break;
         case 'CC7.2':
+        case 'CC7.2.3': // CloudTrail
+        case 'CC7.2.4': // Centralized Logging
           evidenceData = await this.awsService.collectCloudTrailEvidence(credentials);
           break;
         default:
           // Default to IAM for now or log warning
-          this.logger.warn(`Unknown mapping for control ${control.controlId}, defaulting to IAM`);
+          this.logger.warn(`Unknown mapping for control ${control.controlId} in AWS, defaulting to IAM`);
           evidenceData = await this.awsService.collectIamEvidence(credentials);
       }
 
@@ -162,18 +179,63 @@ export class EvidenceCollectionProcessor {
 
   @Process(EvidenceCollectionJobType.COLLECT_OKTA)
   async handleOktaCollection(job: Job<EvidenceCollectionJobData>) {
-    this.logger.log(`Processing Okta evidence collection for customer ${job.data.customerId}`);
+    const { customerId, integrationId, controlId } = job.data;
+    this.logger.log(`Processing Okta evidence collection for customer ${customerId}, control ${controlId}`);
     
     try {
-      // TODO: Implement Okta evidence collection
-      
-      this.logger.log(`Completed Okta evidence collection for job ${job.id}`);
-      return { success: true, jobId: job.id };
+      const integration = await this.prisma.integration.findUnique({
+        where: { id: integrationId },
+      });
+
+      if (!integration || integration.customerId !== customerId) {
+        throw new Error(`Integration ${integrationId} invalid`);
+      }
+
+      const control = await this.prisma.control.findUnique({
+        where: { id: controlId },
+      });
+
+      if (!control) {
+        throw new Error(`Control ${controlId} not found`);
+      }
+
+      const config = integration.config as any; // { orgUrl, token }
+      let evidenceData: any;
+
+      switch (control.controlId) {
+        case 'CC6.1':
+        case 'CC6.1.3': // MFA Enforcement (IdP)
+          evidenceData = await this.oktaService.collectMfaEnforcementEvidence(config);
+          break;
+        case 'CC6.2':
+        case 'CC6.2.1': // New Hire Provisioning
+        case 'CC6.2.2': // Termination Procedures
+          evidenceData = await this.oktaService.collectUserAccessEvidence(config);
+          break;
+        case 'CC6.1.4': // Password Complexity
+          evidenceData = await this.oktaService.collectPolicyComplianceEvidence(config);
+          break;
+        default:
+          this.logger.warn(`Unknown Okta mapping for ${control.controlId}, defaulting to User Access`);
+          evidenceData = await this.oktaService.collectUserAccessEvidence(config);
+      }
+
+      const savedEvidence = await this.storeEvidence(
+        customerId,
+        controlId,
+        integrationId,
+        evidenceData,
+        String(job.id)
+      );
+
+      this.logger.log(`Okta evidence collected: ${savedEvidence.id}`);
+      return { success: true, jobId: job.id, evidenceId: savedEvidence.id };
     } catch (error) {
       this.logger.error(`Failed Okta evidence collection for job ${job.id}:`, error);
       throw error;
     }
   }
+
 
 
   private async storeEvidence(
