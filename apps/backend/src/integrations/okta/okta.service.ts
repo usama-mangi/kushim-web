@@ -7,31 +7,51 @@ import { retryWithBackoff, CircuitBreaker } from '../../common/utils/retry.util'
 export class OktaService {
   private readonly logger = new Logger(OktaService.name);
   private readonly circuitBreaker = new CircuitBreaker();
-  private oktaClient: okta.Client;
+  private defaultOktaClient: okta.Client;
 
   constructor(private configService: ConfigService) {
     const orgUrl = this.configService.get('OKTA_DOMAIN', '');
     const token = this.configService.get('OKTA_API_TOKEN', '');
 
-    this.oktaClient = new okta.Client({
+    this.defaultOktaClient = new okta.Client({
       orgUrl,
       token,
     });
+  }
+
+  private getClient(config?: { orgUrl: string; token: string }): okta.Client {
+    if (!config) return this.defaultOktaClient;
+    return new okta.Client(config);
+  }
+
+  /**
+   * Check connection validity
+   */
+  async checkConnection(config?: { orgUrl: string; token: string }): Promise<boolean> {
+    try {
+      const client = this.getClient(config);
+      await client.userApi.listUsers({ limit: 1 });
+      return true;
+    } catch (error) {
+      this.logger.error('Okta connection check failed', error);
+      return false;
+    }
   }
 
   /**
    * Collect MFA enforcement evidence
    * SOC 2 Control: CC6.1 (Logical Access Controls)
    */
-  async collectMfaEnforcementEvidence() {
+  async collectMfaEnforcementEvidence(config?: { orgUrl: string; token: string }) {
     this.logger.log('Collecting Okta MFA enforcement evidence...');
+    const client = this.getClient(config);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         const users: any[] = [];
         
         // Collect all users
-        const userCollection = await this.oktaClient.userApi.listUsers({});
+        const userCollection = await client.userApi.listUsers({});
         for await (const user of userCollection) {
           users.push(user);
         }
@@ -40,7 +60,7 @@ export class OktaService {
           users.map(async (user) => {
             try {
               const factors: any[] = [];
-              const factorCollection = await this.oktaClient.userFactorApi.listFactors({
+              const factorCollection = await client.userFactorApi.listFactors({
                 userId: user.id,
               });
               
@@ -108,14 +128,15 @@ export class OktaService {
    * Collect user access evidence
    * SOC 2 Control: CC6.2 (User Access Management)
    */
-  async collectUserAccessEvidence() {
+  async collectUserAccessEvidence(config?: { orgUrl: string; token: string }) {
     this.logger.log('Collecting Okta user access evidence...');
+    const client = this.getClient(config);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         const users: any[] = [];
         
-        const userCollection = await this.oktaClient.userApi.listUsers({});
+        const userCollection = await client.userApi.listUsers({});
         for await (const user of userCollection) {
           users.push(user);
         }
@@ -151,15 +172,16 @@ export class OktaService {
    * Collect policy compliance evidence
    * SOC 2 Control: CC6.1 (Access Policies)
    */
-  async collectPolicyComplianceEvidence() {
+  async collectPolicyComplianceEvidence(config?: { orgUrl: string; token: string }) {
     this.logger.log('Collecting Okta policy compliance evidence...');
+    const client = this.getClient(config);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         const policies: any[] = [];
         
         try {
-          const policyCollection = await this.oktaClient.policyApi.listPolicies({
+          const policyCollection = await client.policyApi.listPolicies({
             type: 'PASSWORD',
           });
           
@@ -199,12 +221,12 @@ export class OktaService {
   /**
    * Calculate overall health score for Okta integration
    */
-  async calculateHealthScore(): Promise<number> {
+  async calculateHealthScore(config?: { orgUrl: string; token: string }): Promise<number> {
     try {
       const [mfaEnforcement, userAccess, policyCompliance] = await Promise.all([
-        this.collectMfaEnforcementEvidence(),
-        this.collectUserAccessEvidence(),
-        this.collectPolicyComplianceEvidence(),
+        this.collectMfaEnforcementEvidence(config),
+        this.collectUserAccessEvidence(config),
+        this.collectPolicyComplianceEvidence(config),
       ]);
 
       const scores = [

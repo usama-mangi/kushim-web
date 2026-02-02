@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AwsService } from '../../integrations/aws/aws.service';
 import { GitHubService } from '../../integrations/github/github.service';
 import { OktaService } from '../../integrations/okta/okta.service';
@@ -9,8 +10,10 @@ export interface IntegrationHealth {
   integration: string;
   status: 'healthy' | 'degraded' | 'unhealthy';
   healthScore?: number;
-  circuitBreakerState: string;
-  failureCount: number;
+  circuitBreaker: {
+    state: string;
+    failureCount: number;
+  };
   lastChecked: Date;
   details?: any;
 }
@@ -20,8 +23,8 @@ export interface IntegrationReliabilityMetrics {
   healthyIntegrations: number;
   degradedIntegrations: number;
   unhealthyIntegrations: number;
-  overallHealthScore: number;
-  integrations: IntegrationHealth[];
+  averageHealthScore: number;
+  integrations: Record<string, IntegrationHealth>;
 }
 
 @Injectable()
@@ -29,6 +32,7 @@ export class IntegrationReliabilityService {
   private readonly logger = new Logger(IntegrationReliabilityService.name);
 
   constructor(
+    private configService: ConfigService,
     private awsService: AwsService,
     private githubService: GitHubService,
     private oktaService: OktaService,
@@ -50,7 +54,7 @@ export class IntegrationReliabilityService {
       this.checkSlackHealth(),
     ]);
 
-    const integrations: IntegrationHealth[] = integrationChecks.map((result, index) => {
+    const integrationList: IntegrationHealth[] = integrationChecks.map((result, index) => {
       if (result.status === 'fulfilled') {
         return result.value;
       } else {
@@ -59,32 +63,40 @@ export class IntegrationReliabilityService {
           integration: integrationNames[index],
           status: 'unhealthy' as const,
           healthScore: 0,
-          circuitBreakerState: 'OPEN',
-          failureCount: 999,
+          circuitBreaker: {
+            state: 'OPEN',
+            failureCount: 999,
+          },
           lastChecked: new Date(),
           details: { error: result.reason?.message || 'Unknown error' },
         };
       }
     });
 
-    const healthyIntegrations = integrations.filter((i) => i.status === 'healthy').length;
-    const degradedIntegrations = integrations.filter((i) => i.status === 'degraded').length;
-    const unhealthyIntegrations = integrations.filter((i) => i.status === 'unhealthy').length;
+    const healthyIntegrations = integrationList.filter((i) => i.status === 'healthy').length;
+    const degradedIntegrations = integrationList.filter((i) => i.status === 'degraded').length;
+    const unhealthyIntegrations = integrationList.filter((i) => i.status === 'unhealthy').length;
 
-    const overallHealthScore =
-      integrations.reduce((sum, i) => sum + (i.healthScore || 0), 0) / integrations.length;
+    const averageHealthScore =
+      integrationList.reduce((sum, i) => sum + (i.healthScore || 0), 0) / integrationList.length;
+
+    // Convert list to object map
+    const integrationsMap: Record<string, IntegrationHealth> = {};
+    integrationList.forEach((i) => {
+      integrationsMap[i.integration] = i;
+    });
 
     this.logger.log(
       `Integration health check complete: ${healthyIntegrations} healthy, ${degradedIntegrations} degraded, ${unhealthyIntegrations} unhealthy`,
     );
 
     return {
-      totalIntegrations: integrations.length,
+      totalIntegrations: integrationList.length,
       healthyIntegrations,
       degradedIntegrations,
       unhealthyIntegrations,
-      overallHealthScore,
-      integrations,
+      averageHealthScore,
+      integrations: integrationsMap,
     };
   }
 
@@ -100,8 +112,10 @@ export class IntegrationReliabilityService {
         integration: 'aws',
         status: this.determineStatus(healthScore, circuitBreaker.failureCount),
         healthScore,
-        circuitBreakerState: circuitBreaker.state,
-        failureCount: circuitBreaker.failureCount,
+        circuitBreaker: {
+            state: circuitBreaker.state,
+            failureCount: circuitBreaker.failureCount
+        },
         lastChecked: new Date(),
       };
     } catch (error) {
@@ -115,18 +129,33 @@ export class IntegrationReliabilityService {
    */
   private async checkGitHubHealth(): Promise<IntegrationHealth> {
     try {
-      // For GitHub, we need owner/repo - using a placeholder for health check
-      // In production, this would check configured repositories
+      const owner = this.configService.get('GITHUB_OWNER');
+      const repo = this.configService.get('GITHUB_REPO');
       const circuitBreaker = this.githubService.getCircuitBreakerStatus();
+      let healthScore = 0;
+      let status: 'healthy' | 'degraded' | 'unhealthy' = 'unhealthy';
+      let details: any = {};
+
+      if (owner && repo) {
+        healthScore = await this.githubService.calculateHealthScore(owner, repo);
+        status = this.determineStatus(healthScore, circuitBreaker.failureCount);
+      } else {
+        const isConnected = await this.githubService.checkConnection();
+        status = isConnected ? 'healthy' : 'unhealthy';
+        healthScore = isConnected ? 1 : 0;
+        details = { note: 'Basic connection check (Repo details not configured)' };
+      }
 
       return {
         integration: 'github',
-        status: circuitBreaker.state === 'OPEN' ? 'unhealthy' : 'healthy',
-        healthScore: circuitBreaker.state === 'OPEN' ? 0 : 1,
-        circuitBreakerState: circuitBreaker.state,
-        failureCount: circuitBreaker.failureCount,
+        status,
+        healthScore,
+        circuitBreaker: {
+            state: circuitBreaker.state,
+            failureCount: circuitBreaker.failureCount
+        },
         lastChecked: new Date(),
-        details: { note: 'Health check requires specific repository configuration' },
+        details,
       };
     } catch (error) {
       this.logger.error('Failed to check GitHub health:', error);
@@ -146,8 +175,10 @@ export class IntegrationReliabilityService {
         integration: 'okta',
         status: this.determineStatus(healthScore, circuitBreaker.failureCount),
         healthScore,
-        circuitBreakerState: circuitBreaker.state,
-        failureCount: circuitBreaker.failureCount,
+        circuitBreaker: {
+            state: circuitBreaker.state,
+            failureCount: circuitBreaker.failureCount
+        },
         lastChecked: new Date(),
       };
     } catch (error) {
@@ -162,13 +193,18 @@ export class IntegrationReliabilityService {
   private async checkJiraHealth(): Promise<IntegrationHealth> {
     try {
       const circuitBreaker = this.jiraService.getCircuitBreakerStatus();
+      const isConnected = await this.jiraService.checkConnection();
+      
+      const status = isConnected && circuitBreaker.state !== 'OPEN' ? 'healthy' : 'unhealthy';
 
       return {
         integration: 'jira',
-        status: circuitBreaker.state === 'OPEN' ? 'unhealthy' : 'healthy',
-        healthScore: circuitBreaker.state === 'OPEN' ? 0 : 1,
-        circuitBreakerState: circuitBreaker.state,
-        failureCount: circuitBreaker.failureCount,
+        status,
+        healthScore: status === 'healthy' ? 1 : 0,
+        circuitBreaker: {
+            state: circuitBreaker.state,
+            failureCount: circuitBreaker.failureCount
+        },
         lastChecked: new Date(),
       };
     } catch (error) {
@@ -183,13 +219,18 @@ export class IntegrationReliabilityService {
   private async checkSlackHealth(): Promise<IntegrationHealth> {
     try {
       const circuitBreaker = this.slackService.getCircuitBreakerStatus();
+      const isConnected = await this.slackService.checkConnection();
+
+      const status = isConnected && circuitBreaker.state !== 'OPEN' ? 'healthy' : 'unhealthy';
 
       return {
         integration: 'slack',
-        status: circuitBreaker.state === 'OPEN' ? 'unhealthy' : 'healthy',
-        healthScore: circuitBreaker.state === 'OPEN' ? 0 : 1,
-        circuitBreakerState: circuitBreaker.state,
-        failureCount: circuitBreaker.failureCount,
+        status,
+        healthScore: status === 'healthy' ? 1 : 0,
+        circuitBreaker: {
+            state: circuitBreaker.state,
+            failureCount: circuitBreaker.failureCount
+        },
         lastChecked: new Date(),
       };
     } catch (error) {
@@ -221,7 +262,9 @@ export class IntegrationReliabilityService {
    * Send health alerts to Slack if any integration is unhealthy
    */
   async sendHealthAlertsIfNeeded(metrics: IntegrationReliabilityMetrics): Promise<void> {
-    const unhealthyIntegrations = metrics.integrations.filter(
+    // metrics.integrations is now a Record, need to convert to array for filtering
+    const integrationList = Object.values(metrics.integrations);
+    const unhealthyIntegrations = integrationList.filter(
       (i) => i.status === 'unhealthy' || i.status === 'degraded',
     );
 
@@ -236,8 +279,8 @@ export class IntegrationReliabilityService {
           healthScore: integration.healthScore || 0,
           issues: [
             `Status: ${integration.status}`,
-            `Circuit Breaker: ${integration.circuitBreakerState}`,
-            `Failure Count: ${integration.failureCount}`,
+            `Circuit Breaker: ${integration.circuitBreaker.state}`,
+            `Failure Count: ${integration.circuitBreaker.failureCount}`,
             ...(integration.details ? [JSON.stringify(integration.details)] : []),
           ],
         });

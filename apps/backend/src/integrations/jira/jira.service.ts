@@ -21,16 +21,16 @@ interface JiraIssue {
 export class JiraService {
   private readonly logger = new Logger(JiraService.name);
   private readonly circuitBreaker = new CircuitBreaker();
-  private jiraClient: AxiosInstance;
-  private jiraDomain: string;
+  private defaultJiraClient: AxiosInstance;
+  private defaultJiraDomain: string;
 
   constructor(private configService: ConfigService) {
-    this.jiraDomain = this.configService.get('JIRA_DOMAIN', '');
+    this.defaultJiraDomain = this.configService.get('JIRA_DOMAIN', '');
     const email = this.configService.get('JIRA_EMAIL', '');
     const apiToken = this.configService.get('JIRA_API_TOKEN', '');
 
-    this.jiraClient = axios.create({
-      baseURL: `https://${this.jiraDomain}/rest/api/3`,
+    this.defaultJiraClient = axios.create({
+      baseURL: `https://${this.defaultJiraDomain}/rest/api/3`,
       auth: {
         username: email,
         password: apiToken,
@@ -39,6 +39,39 @@ export class JiraService {
         'Content-Type': 'application/json',
       },
     });
+  }
+
+  private getClient(config?: { domain: string; email: string; apiToken: string }): { client: AxiosInstance; domain: string } {
+    if (!config) {
+      return { client: this.defaultJiraClient, domain: this.defaultJiraDomain };
+    }
+    return {
+      client: axios.create({
+        baseURL: `https://${config.domain}/rest/api/3`,
+        auth: {
+          username: config.email,
+          password: config.apiToken,
+        },
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+      domain: config.domain,
+    };
+  }
+
+  /**
+   * Check connection validity
+   */
+  async checkConnection(config?: { domain: string; email: string; apiToken: string }): Promise<boolean> {
+    try {
+      const { client } = this.getClient(config);
+      await client.get('/myself');
+      return true;
+    } catch (error) {
+      this.logger.error('Jira connection check failed', error);
+      return false;
+    }
   }
 
   /**
@@ -52,12 +85,14 @@ export class JiraService {
     failureReason: string;
     evidenceId: string;
     projectKey: string;
+    config?: { domain: string; email: string; apiToken: string };
   }) {
     this.logger.log(`Creating Jira remediation ticket for control ${data.controlId}...`);
+    const { client, domain } = this.getClient(data.config);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
-        const response = await this.jiraClient.post('/issue', {
+        const response = await client.post('/issue', {
           fields: {
             project: {
               key: data.projectKey,
@@ -118,7 +153,7 @@ export class JiraService {
             issueKey: issue.key,
             issueId: issue.id,
             controlId: data.controlId,
-            url: `https://${this.jiraDomain}/browse/${issue.key}`,
+            url: `https://${domain}/browse/${issue.key}`,
           },
           status: 'SUCCESS',
         };
@@ -129,13 +164,14 @@ export class JiraService {
   /**
    * Update an existing Jira ticket status
    */
-  async updateTicketStatus(issueKey: string, status: string) {
+  async updateTicketStatus(issueKey: string, status: string, config?: { domain: string; email: string; apiToken: string }) {
     this.logger.log(`Updating Jira ticket ${issueKey} status to ${status}...`);
+    const { client } = this.getClient(config);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         // Get available transitions
-        const transitionsResponse = await this.jiraClient.get(
+        const transitionsResponse = await client.get(
           `/issue/${issueKey}/transitions`,
         );
 
@@ -147,7 +183,7 @@ export class JiraService {
           throw new Error(`Transition to status "${status}" not found`);
         }
 
-        await this.jiraClient.post(`/issue/${issueKey}/transitions`, {
+        await client.post(`/issue/${issueKey}/transitions`, {
           transition: {
             id: transition.id,
           },
@@ -171,12 +207,13 @@ export class JiraService {
   /**
    * Sync ticket status from Jira
    */
-  async syncTicketStatus(issueKey: string) {
+  async syncTicketStatus(issueKey: string, config?: { domain: string; email: string; apiToken: string }) {
     this.logger.log(`Syncing Jira ticket ${issueKey} status...`);
+    const { client } = this.getClient(config);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
-        const response = await this.jiraClient.get(`/issue/${issueKey}`);
+        const response = await client.get(`/issue/${issueKey}`);
         const issue: JiraIssue = response.data;
 
         this.logger.log(`Synced Jira ticket ${issueKey}: ${issue.fields.status.name}`);

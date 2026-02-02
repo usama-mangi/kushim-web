@@ -7,23 +7,43 @@ import { retryWithBackoff, CircuitBreaker } from '../../common/utils/retry.util'
 export class GitHubService {
   private readonly logger = new Logger(GitHubService.name);
   private readonly circuitBreaker = new CircuitBreaker();
-  private octokit: Octokit;
+  private defaultOctokit: Octokit;
 
   constructor(private configService: ConfigService) {
     const token = this.configService.get('GITHUB_TOKEN', '');
-    this.octokit = new Octokit({ auth: token });
+    this.defaultOctokit = new Octokit({ auth: token });
+  }
+
+  private getOctokit(token?: string): Octokit {
+    if (!token) return this.defaultOctokit;
+    return new Octokit({ auth: token });
+  }
+
+  /**
+   * Check connection validity (Health Check)
+   */
+  async checkConnection(token?: string): Promise<boolean> {
+    try {
+      const octokit = this.getOctokit(token);
+      await octokit.users.getAuthenticated();
+      return true;
+    } catch (error) {
+      this.logger.error('GitHub connection check failed', error);
+      return false;
+    }
   }
 
   /**
    * Collect branch protection evidence
    * SOC 2 Control: CC8.1 (Change Management)
    */
-  async collectBranchProtectionEvidence(owner: string, repo: string) {
+  async collectBranchProtectionEvidence(owner: string, repo: string, token?: string) {
     this.logger.log(`Collecting branch protection evidence for ${owner}/${repo}...`);
+    const octokit = this.getOctokit(token);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
-        const branches = await this.octokit.repos.listBranches({
+        const branches = await octokit.repos.listBranches({
           owner,
           repo,
         });
@@ -31,7 +51,7 @@ export class GitHubService {
         const branchProtectionStatus = await Promise.all(
           branches.data.map(async (branch) => {
             try {
-              const protection = await this.octokit.repos.getBranchProtection({
+              const protection = await octokit.repos.getBranchProtection({
                 owner,
                 repo,
                 branch: branch.name,
@@ -95,12 +115,13 @@ export class GitHubService {
    * Collect commit signing evidence
    * SOC 2 Control: CC6.2 (Authentication)
    */
-  async collectCommitSigningEvidence(owner: string, repo: string) {
+  async collectCommitSigningEvidence(owner: string, repo: string, token?: string) {
     this.logger.log(`Collecting commit signing evidence for ${owner}/${repo}...`);
+    const octokit = this.getOctokit(token);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
-        const commits = await this.octokit.repos.listCommits({
+        const commits = await octokit.repos.listCommits({
           owner,
           repo,
           per_page: 100,
@@ -144,14 +165,15 @@ export class GitHubService {
    * Collect repository security evidence
    * SOC 2 Control: CC7.2 (System Monitoring)
    */
-  async collectSecurityEvidence(owner: string, repo: string) {
+  async collectSecurityEvidence(owner: string, repo: string, token?: string) {
     this.logger.log(`Collecting security evidence for ${owner}/${repo}...`);
+    const octokit = this.getOctokit(token);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         const [repository, vulnerabilityAlerts] = await Promise.all([
-          this.octokit.repos.get({ owner, repo }),
-          this.octokit.repos.checkVulnerabilityAlerts({ owner, repo }).catch(() => ({
+          octokit.repos.get({ owner, repo }),
+          octokit.repos.checkVulnerabilityAlerts({ owner, repo }).catch(() => ({
             status: 204,
           })),
         ]);
@@ -190,12 +212,12 @@ export class GitHubService {
   /**
    * Calculate overall health score for GitHub integration
    */
-  async calculateHealthScore(owner: string, repo: string): Promise<number> {
+  async calculateHealthScore(owner: string, repo: string, token?: string): Promise<number> {
     try {
       const [branchProtection, commitSigning, security] = await Promise.all([
-        this.collectBranchProtectionEvidence(owner, repo),
-        this.collectCommitSigningEvidence(owner, repo),
-        this.collectSecurityEvidence(owner, repo),
+        this.collectBranchProtectionEvidence(owner, repo, token),
+        this.collectCommitSigningEvidence(owner, repo, token),
+        this.collectSecurityEvidence(owner, repo, token),
       ]);
 
       const scores = [

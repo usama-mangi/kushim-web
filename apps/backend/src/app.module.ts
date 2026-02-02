@@ -8,8 +8,6 @@ import {
   EvidenceCollectionQueueModule,
   ComplianceCheckQueueModule,
 } from './shared/queue/queues.module';
-import { EvidenceCollectionProcessor } from './shared/queue/processors/evidence-collection.processor';
-import { ComplianceCheckProcessor } from './shared/queue/processors/compliance-check.processor';
 import { AwsModule } from './integrations/aws/aws.module';
 import { GitHubModule } from './integrations/github/github.module';
 import { OktaModule } from './integrations/okta/okta.module';
@@ -17,6 +15,7 @@ import { JiraModule } from './integrations/jira/jira.module';
 import { SlackModule } from './integrations/slack/slack.module';
 import { IntegrationReliabilityModule } from './shared/reliability/integration-reliability.module';
 import { AuthModule } from './auth/auth.module';
+import { EvidenceModule } from './evidence/evidence.module';
 
 @Module({
   imports: [
@@ -35,12 +34,11 @@ import { AuthModule } from './auth/auth.module';
     SlackModule,
     IntegrationReliabilityModule,
     AuthModule,
+    EvidenceModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
-    EvidenceCollectionProcessor,
-    ComplianceCheckProcessor,
   ],
 })
 export class AppModule {}

@@ -3,13 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import {
   IAMClient,
   ListUsersCommand,
-  GetUserCommand,
   ListMFADevicesCommand,
 } from '@aws-sdk/client-iam';
 import {
   S3Client,
   ListBucketsCommand,
   GetBucketEncryptionCommand,
+  PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import {
   CloudTrailClient,
@@ -21,9 +21,9 @@ import { retryWithBackoff, CircuitBreaker } from '../../common/utils/retry.util'
 export class AwsService {
   private readonly logger = new Logger(AwsService.name);
   private readonly circuitBreaker = new CircuitBreaker();
-  private iamClient: IAMClient;
-  private s3Client: S3Client;
-  private cloudTrailClient: CloudTrailClient;
+  private defaultIamClient: IAMClient;
+  private defaultS3Client: S3Client;
+  private defaultCloudTrailClient: CloudTrailClient;
 
   constructor(private configService: ConfigService) {
     const region = this.configService.get('AWS_REGION', 'us-east-1');
@@ -32,25 +32,59 @@ export class AwsService {
       secretAccessKey: this.configService.get('AWS_SECRET_ACCESS_KEY', ''),
     };
 
-    this.iamClient = new IAMClient({ region, credentials });
-    this.s3Client = new S3Client({ region, credentials });
-    this.cloudTrailClient = new CloudTrailClient({ region, credentials });
+    this.defaultIamClient = new IAMClient({ region, credentials });
+    this.defaultS3Client = new S3Client({ region, credentials });
+    this.defaultCloudTrailClient = new CloudTrailClient({ region, credentials });
+  }
+
+  private getIamClient(credentials?: any): IAMClient {
+    if (!credentials) return this.defaultIamClient;
+    return new IAMClient({
+      region: this.configService.get('AWS_REGION', 'us-east-1'),
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+      },
+    });
+  }
+
+  private getS3Client(credentials?: any): S3Client {
+    if (!credentials) return this.defaultS3Client;
+    return new S3Client({
+      region: this.configService.get('AWS_REGION', 'us-east-1'),
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+      },
+    });
+  }
+
+  private getCloudTrailClient(credentials?: any): CloudTrailClient {
+    if (!credentials) return this.defaultCloudTrailClient;
+    return new CloudTrailClient({
+      region: this.configService.get('AWS_REGION', 'us-east-1'),
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+      },
+    });
   }
 
   /**
    * Collect IAM evidence - Check MFA enforcement
    * SOC 2 Control: CC6.1 (Logical Access Controls)
    */
-  async collectIamEvidence() {
+  async collectIamEvidence(credentials?: any) {
     this.logger.log('Collecting IAM evidence...');
+    const client = this.getIamClient(credentials);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
-        const users = await this.iamClient.send(new ListUsersCommand({}));
+        const users = await client.send(new ListUsersCommand({}));
         
         const userMfaStatus = await Promise.all(
           (users.Users || []).map(async (user) => {
-            const mfaDevices = await this.iamClient.send(
+            const mfaDevices = await client.send(
               new ListMFADevicesCommand({ UserName: user.UserName }),
             );
 
@@ -90,17 +124,18 @@ export class AwsService {
    * Collect S3 evidence - Check bucket encryption
    * SOC 2 Control: CC6.7 (Encryption)
    */
-  async collectS3Evidence() {
+  async collectS3Evidence(credentials?: any) {
     this.logger.log('Collecting S3 evidence...');
+    const client = this.getS3Client(credentials);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
-        const buckets = await this.s3Client.send(new ListBucketsCommand({}));
+        const buckets = await client.send(new ListBucketsCommand({}));
 
         const bucketEncryptionStatus = await Promise.all(
           (buckets.Buckets || []).map(async (bucket) => {
             try {
-              const encryption = await this.s3Client.send(
+              const encryption = await client.send(
                 new GetBucketEncryptionCommand({ Bucket: bucket.Name }),
               );
 
@@ -146,18 +181,54 @@ export class AwsService {
   }
 
   /**
+   * Upload evidence file to S3 storage
+   * Used for large evidence payloads or files that shouldn't be stored in DB
+   */
+  async uploadEvidenceToS3(key: string, data: string | Buffer, contentType: string = 'application/json') {
+    this.logger.log(`Uploading evidence to S3: ${key}`);
+    const bucketName = this.configService.get('AWS_S3_BUCKET_NAME');
+
+    if (!bucketName) {
+      this.logger.warn('AWS_S3_BUCKET_NAME not configured, skipping S3 upload');
+      return null;
+    }
+
+    try {
+      await this.defaultS3Client.send(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: key,
+          Body: data,
+          ContentType: contentType,
+          ServerSideEncryption: 'AES256',
+        })
+      );
+      
+      return {
+        bucket: bucketName,
+        key: key,
+        url: `https://${bucketName}.s3.amazonaws.com/${key}`
+      };
+    } catch (error) {
+      this.logger.error(`Failed to upload evidence to S3: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
    * Collect CloudTrail evidence - Check audit logging
    * SOC 2 Control: CC7.2 (System Monitoring)
    */
-  async collectCloudTrailEvidence() {
+  async collectCloudTrailEvidence(credentials?: any) {
     this.logger.log('Collecting CloudTrail evidence...');
+    const client = this.getCloudTrailClient(credentials);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         const endTime = new Date();
         const startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000); // Last 24 hours
 
-        const events = await this.cloudTrailClient.send(
+        const events = await client.send(
           new LookupEventsCommand({
             StartTime: startTime,
             EndTime: endTime,
@@ -196,12 +267,12 @@ export class AwsService {
   /**
    * Calculate overall health score for AWS integration
    */
-  async calculateHealthScore(): Promise<number> {
+  async calculateHealthScore(credentials?: any): Promise<number> {
     try {
       const [iamEvidence, s3Evidence, cloudTrailEvidence] = await Promise.all([
-        this.collectIamEvidence(),
-        this.collectS3Evidence(),
-        this.collectCloudTrailEvidence(),
+        this.collectIamEvidence(credentials),
+        this.collectS3Evidence(credentials),
+        this.collectCloudTrailEvidence(credentials),
       ]);
 
       const scores = [

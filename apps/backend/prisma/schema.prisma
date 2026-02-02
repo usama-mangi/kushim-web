@@ -102,6 +102,7 @@ model Control {
   testProcedure  String   @db.Text @map("test_procedure")
   frequency      Frequency
   category       String?
+  integrationType IntegrationType?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

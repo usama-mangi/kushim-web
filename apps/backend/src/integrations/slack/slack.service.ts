@@ -7,10 +7,24 @@ import { retryWithBackoff, CircuitBreaker } from '../../common/utils/retry.util'
 export class SlackService {
   private readonly logger = new Logger(SlackService.name);
   private readonly circuitBreaker = new CircuitBreaker();
-  private webhookUrl: string;
+  private defaultWebhookUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.webhookUrl = this.configService.get('SLACK_WEBHOOK_URL', '');
+    this.defaultWebhookUrl = this.configService.get('SLACK_WEBHOOK_URL', '');
+  }
+
+  private getWebhookUrl(webhookUrl?: string): string {
+    return webhookUrl || this.defaultWebhookUrl;
+  }
+
+  /**
+   * Check connection validity (by sending a test message if desired, or just simple check)
+   * Note: Incoming Webhooks don't have a simple "ping" endpoint, but we can assume if the URL is set it's "connected" until we fail to send.
+   * However, let's just return true if URL is present.
+   */
+  async checkConnection(webhookUrl?: string): Promise<boolean> {
+    const url = this.getWebhookUrl(webhookUrl);
+    return !!url;
   }
 
   /**
@@ -23,8 +37,15 @@ export class SlackService {
     severity: 'info' | 'warning' | 'error';
     controlId?: string;
     evidenceId?: string;
+    webhookUrl?: string;
   }) {
     this.logger.log(`Sending Slack alert: ${data.title}...`);
+    const url = this.getWebhookUrl(data.webhookUrl);
+
+    if (!url) {
+      this.logger.warn('No Slack Webhook URL configured, skipping alert.');
+      return { status: 'SKIPPED' };
+    }
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
@@ -76,7 +97,7 @@ export class SlackService {
           ],
         };
 
-        await axios.post(this.webhookUrl, payload);
+        await axios.post(url, payload);
 
         this.logger.log(`Slack alert sent: ${data.title}`);
 
@@ -102,16 +123,17 @@ export class SlackService {
     failedChecks: number;
     warningChecks: number;
     complianceRate: number;
+    webhookUrl?: string;
   }) {
     this.logger.log('Sending daily compliance summary to Slack...');
 
     const emoji = data.complianceRate >= 0.9 ? ':white_check_mark:' : ':warning:';
-    const color = data.complianceRate >= 0.9 ? '#36a64f' : '#ff9900';
 
     return await this.sendAlert({
       title: `${emoji} Daily Compliance Summary`,
       message: `Compliance Rate: ${(data.complianceRate * 100).toFixed(1)}%\n\nTotal Checks: ${data.totalChecks}\nPassed: ${data.passedChecks}\nFailed: ${data.failedChecks}\nWarnings: ${data.warningChecks}`,
       severity: data.complianceRate >= 0.9 ? 'info' : 'warning',
+      webhookUrl: data.webhookUrl,
     });
   }
 
@@ -122,6 +144,7 @@ export class SlackService {
     integration: string;
     healthScore: number;
     issues: string[];
+    webhookUrl?: string;
   }) {
     this.logger.log(`Sending integration health warning for ${data.integration}...`);
 
@@ -129,6 +152,7 @@ export class SlackService {
       title: `:warning: ${data.integration} Integration Health Warning`,
       message: `Health Score: ${(data.healthScore * 100).toFixed(1)}%\n\nIssues:\n${data.issues.map((i) => `• ${i}`).join('\n')}`,
       severity: 'warning',
+      webhookUrl: data.webhookUrl,
     });
   }
 
