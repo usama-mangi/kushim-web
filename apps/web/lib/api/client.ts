@@ -48,7 +48,7 @@ class ApiClient {
         };
 
         // Log constructed error
-        console.error("[ApiClient] Processed ApiError:", apiError);
+        console.error("[ApiClient] Processed ApiError:", JSON.stringify(apiError, null, 2));
 
         return Promise.reject(apiError);
       }

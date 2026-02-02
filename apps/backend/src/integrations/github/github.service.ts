@@ -66,8 +66,12 @@ export class GitHubService {
                 requiresSignedCommits: protection.data.required_signatures?.enabled || false,
                 enforceAdmins: protection.data.enforce_admins?.enabled || false,
               };
-            } catch (error) {
-              // Branch not protected
+            } catch (error: any) {
+              // GitHub returns 404 if branch protection is not enabled
+              if (error.status !== 404) {
+                this.logger.debug(`Non-404 error fetching protection for ${branch.name}: ${error.message}`);
+              }
+              
               return {
                 branchName: branch.name,
                 protected: false,
@@ -173,8 +177,8 @@ export class GitHubService {
       return await retryWithBackoff(async () => {
         const [repository, vulnerabilityAlerts] = await Promise.all([
           octokit.repos.get({ owner, repo }),
-          octokit.repos.checkVulnerabilityAlerts({ owner, repo }).catch(() => ({
-            status: 204,
+          octokit.repos.checkVulnerabilityAlerts({ owner, repo }).catch((err) => ({
+            status: err.status || 404,
           })),
         ]);
 
@@ -182,8 +186,8 @@ export class GitHubService {
 
         const securityFeatures = {
           vulnerabilityAlertsEnabled: hasVulnerabilityAlerts,
-          hasSecurityPolicy: repository.data.security_and_analysis?.secret_scanning?.status === 'enabled',
-          dependabotEnabled: repository.data.security_and_analysis?.dependabot_security_updates?.status === 'enabled',
+          hasSecurityPolicy: (repository.data as any).security_and_analysis?.secret_scanning?.status === 'enabled',
+          dependabotEnabled: (repository.data as any).security_and_analysis?.dependabot_security_updates?.status === 'enabled',
           privateRepo: repository.data.private,
         };
 

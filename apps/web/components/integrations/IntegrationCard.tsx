@@ -30,9 +30,7 @@ interface IntegrationCardProps {
   isConnected: boolean;
   healthScore?: number;
   lastSync?: Date;
-  onConnect: () => void;
   onDisconnect: () => void;
-  onConfigure: () => void;
   connectionForm: React.ReactNode;
 }
 
@@ -43,6 +41,7 @@ export function IntegrationCard({
   icon,
   isConnected,
   healthScore,
+  lastSync,
   onDisconnect,
   connectionForm,
 }: IntegrationCardProps) {
@@ -82,6 +81,12 @@ export function IntegrationCard({
                 style={{ width: `${healthScore * 100}%` }}
               />
             </div>
+            {lastSync && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+                <span>Last Sync</span>
+                <span>{lastSync.toLocaleString()}</span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-24 text-center text-sm text-muted-foreground">

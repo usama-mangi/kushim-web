@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { forgotPassword } from "@/lib/api/endpoints";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -39,12 +40,7 @@ export function ForgotPasswordForm() {
     setSuccess(false);
 
     try {
-      // Simulate API call for now since backend endpoint might not exist
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // TODO: Call actual API endpoint
-      // await forgotPassword(values.email);
-      
+      await forgotPassword(values.email);
       setSuccess(true);
     } catch (err) {
       setError("Failed to send reset link. Please try again.");

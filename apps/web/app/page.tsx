@@ -6,6 +6,7 @@ import { ComplianceScore } from "@/components/dashboard/ComplianceScore";
 import { IntegrationHealth } from "@/components/dashboard/IntegrationHealth";
 import { ControlStatus } from "@/components/dashboard/ControlStatus";
 import { RecentAlerts } from "@/components/dashboard/RecentAlerts";
+import { ComplianceTrends } from "@/components/dashboard/ComplianceTrends";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, AlertCircle } from "lucide-react";
@@ -109,10 +110,7 @@ export default function Home() {
               <ComplianceScore />
             </div>
             <div className="lg:col-span-2">
-              {/* Placeholder for additional metrics */}
-              <div className="h-full flex items-center justify-center text-muted-foreground">
-                Additional metrics coming soon
-              </div>
+              <ComplianceTrends />
             </div>
           </div>
 

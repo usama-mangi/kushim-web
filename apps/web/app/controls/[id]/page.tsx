@@ -1,191 +1,230 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { useDashboardStore } from "@/store/dashboard";
-import { Button } from "@/components/ui/button";
+import { useParams, useRouter } from "next/navigation";
+import { getControlDetails } from "@/lib/api/endpoints";
+import { useAuthStore } from "@/store/auth";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EvidenceViewer } from "@/components/evidence/EvidenceViewer";
 import { 
   ArrowLeft, 
   CheckCircle2, 
   XCircle, 
   AlertTriangle, 
+  ExternalLink,
+  ShieldCheck,
   History,
-  Calendar
+  FileSearch
 } from "lucide-react";
 import { formatDate, getStatusBgColor } from "@/lib/utils";
-import type { Evidence, Control } from "@/lib/api/types";
+import { EvidenceViewer } from "@/components/evidence/EvidenceViewer";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function ControlDetailPage() {
-  const params = useParams();
-  const id = params?.id as string;
-  const { controls, fetchDashboardData } = useDashboardStore();
-  const [control, setControl] = useState<Control | null>(null);
-  const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
+  const { id } = useParams();
+  const router = useRouter();
+  const { isAuthenticated } = useAuthStore();
+  const [control, setControl] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (controls.length === 0) {
-      fetchDashboardData();
-    } else {
-      const foundControl = controls.find((c) => c.id === id);
-      setControl(foundControl || null);
-      // Select first evidence by default if available
-      // Mocking evidence for now since it's not in the main store yet
-      if (foundControl) {
-        // This would come from an API call in a real app
-        const mockEvidence: Evidence = {
-          id: `ev-${id}-001`,
-          controlId: id,
-          timestamp: new Date().toISOString(),
-          type: "Configuration Snapshot",
-          source: foundControl.integration,
-          data: {
-            configuration: {
-              mfaEnabled: true,
-              passwordPolicy: "strong",
-              users: 42
-            },
-            complianceCheck: {
-              passed: true,
-              rule: "MFA-001"
-            }
-          },
-          hash: "sha256:mock-hash-123456789"
-        };
-        setSelectedEvidence(mockEvidence);
-      }
-    }
-  }, [id, controls, fetchDashboardData]);
+    if (!isAuthenticated) return;
 
-  if (!control) {
+    const fetchDetails = async () => {
+      try {
+        const data = await getControlDetails(id as string);
+        setControl(data);
+      } catch (err: any) {
+        setError(err.message || "Failed to load control details");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDetails();
+  }, [id, isAuthenticated]);
+
+  if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-10 w-10 rounded-md" />
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-32" />
-          </div>
-        </div>
+      <div className="container mx-auto py-10 space-y-6">
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-[200px] w-full" />
         <Skeleton className="h-[400px] w-full" />
       </div>
     );
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "PASS":
-        return <CheckCircle2 className="h-5 w-5 text-success" />;
-      case "FAIL":
-        return <XCircle className="h-5 w-5 text-error" />;
-      case "WARNING":
-        return <AlertTriangle className="h-5 w-5 text-warning" />;
-      default:
-        return <AlertTriangle className="h-5 w-5 text-muted-foreground" />;
-    }
-  };
+  if (error || !control) {
+    return (
+      <div className="container mx-auto py-10 text-center">
+        <h1 className="text-2xl font-bold text-error">Control Not Found</h1>
+        <p className="text-muted-foreground mt-2">{error || "The control you are looking for does not exist."}</p>
+        <Button variant="outline" className="mt-4" onClick={() => router.back()}>
+          Go Back
+        </Button>
+      </div>
+    );
+  }
+
+  const latestCheck = control.complianceChecks[0];
+  const status = latestCheck?.status || "PENDING";
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{control.name}</h1>
-                <Badge className={getStatusBgColor(control.status)}>
-                  <span className="flex items-center gap-1">
-                    {getStatusIcon(control.status)}
-                    {control.status}
-                  </span>
+    <div className="container mx-auto py-10 space-y-6">
+      <Button variant="ghost" onClick={() => router.back()} className="mb-2">
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+      </Button>
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">{control.controlId}</Badge>
+            <h1 className="text-2xl font-bold">{control.title}</h1>
+          </div>
+          <p className="text-muted-foreground">{control.category} • SOC 2 Framework</p>
+        </div>
+        <Badge className={`text-lg py-1 px-4 ${getStatusBgColor(status)}`}>
+          {status}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Info */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                Control Description
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="prose prose-sm dark:prose-invert">
+              <p>{control.description}</p>
+              <h4 className="mt-4 text-sm font-semibold">Test Procedure</h4>
+              <p>{control.testProcedure}</p>
+            </CardContent>
+          </Card>
+
+          <Tabs defaultValue="evidence" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="evidence">
+                <FileSearch className="h-4 w-4 mr-2" />
+                Latest Evidence
+              </TabsTrigger>
+              <TabsTrigger value="history">
+                <History className="h-4 w-4 mr-2" />
+                Audit History
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="evidence" className="pt-4">
+              {control.evidence && control.evidence.length > 0 ? (
+                <div className="space-y-4">
+                  {control.evidence.map((ev: any) => (
+                    <EvidenceViewer key={ev.id} evidence={{
+                        id: ev.id,
+                        controlId: control.id,
+                        timestamp: ev.collectedAt,
+                        type: control.integrationType || 'AUTOMATED',
+                        source: control.integrationType || 'SYSTEM',
+                        data: ev.data,
+                        hash: ev.hash
+                    }} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 border rounded-lg bg-muted/20">
+                  <p className="text-muted-foreground">No evidence has been collected yet.</p>
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="history" className="pt-4">
+              {control.complianceChecks && control.complianceChecks.length > 0 ? (
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="divide-y">
+                      {control.complianceChecks.map((check: any) => (
+                        <div key={check.id} className="p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            {check.status === 'PASS' ? (
+                              <CheckCircle2 className="h-5 w-5 text-success" />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-error" />
+                            )}
+                            <div>
+                              <p className="font-medium">Self-Assessment Check</p>
+                              <p className="text-xs text-muted-foreground">{formatDate(check.checkedAt)}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline">{check.status}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="text-center py-12 border rounded-lg bg-muted/20">
+                  <p className="text-muted-foreground">No audit history available for this control.</p>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Sidebar Info */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Integrations</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Provider</span>
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  {control.integrationType || 'Manual Verification'}
                 </Badge>
               </div>
-              <p className="text-muted-foreground mt-1">
-                {control.description}
-              </p>
-            </div>
-            <div className="text-right text-sm text-muted-foreground">
-              <div className="flex items-center justify-end gap-2">
-                <History className="h-4 w-4" />
-                Last checked: {formatDate(control.lastCheck)}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Frequency</span>
+                <span className="text-sm font-medium capitalize">{control.frequency ? control.frequency.toLowerCase() : 'N/A'}</span>
               </div>
-              <div className="flex items-center justify-end gap-2 mt-1">
-                <Calendar className="h-4 w-4" />
-                Next check: {formatDate(new Date(new Date(control.lastCheck).getTime() + 24 * 60 * 60 * 1000))}
-              </div>
-            </div>
-          </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => router.push('/integrations')}
+              >
+                <ExternalLink className="h-3 w-3 mr-2" />
+                View Integration Settings
+              </Button>
+            </CardContent>
+          </Card>
+
+          {status === 'FAIL' && (
+            <Card className="border-error/50 bg-error/5">
+                <CardHeader>
+                    <CardTitle className="text-sm font-semibold text-error flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Remediation Required
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                    <p className="text-xs">A Jira ticket has been automatically created to track the remediation of this control failure.</p>
+                    <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={() => router.push('/integrations')}
+                    >
+                        View Jira Status
+                    </Button>
+                </CardContent>
+            </Card>
+          )}
         </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content - Evidence Viewer */}
-          <div className="lg:col-span-2">
-            <h2 className="text-lg font-semibold mb-4">Latest Evidence</h2>
-            {selectedEvidence ? (
-              <EvidenceViewer evidence={selectedEvidence} />
-            ) : (
-              <div className="border rounded-lg p-12 text-center text-muted-foreground bg-muted/20">
-                No evidence collected yet.
-              </div>
-            )}
-          </div>
-
-          {/* Sidebar - Context & History */}
-          <div className="space-y-6">
-            <div className="border rounded-lg p-6 bg-card">
-              <h3 className="font-semibold mb-4">Control Details</h3>
-              <div className="space-y-4">
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Integration</span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline">{control.integration}</Badge>
-                  </div>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Check Frequency</span>
-                  <p className="text-sm mt-1">Daily (Every 24 hours)</p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Control Owner</span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                      JD
-                    </div>
-                    <span className="text-sm">John Doe</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="border rounded-lg p-6 bg-card">
-              <h3 className="font-semibold mb-4">History</h3>
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${i === 1 ? "bg-success" : "bg-success"}`} />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Passed Check</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(new Date(new Date().getTime() - i * 24 * 60 * 60 * 1000))}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

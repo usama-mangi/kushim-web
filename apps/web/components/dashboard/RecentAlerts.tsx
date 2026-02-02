@@ -46,7 +46,7 @@ export function RecentAlerts() {
   };
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="h-[500px] flex flex-col">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <AlertCircle className="h-5 w-5" />

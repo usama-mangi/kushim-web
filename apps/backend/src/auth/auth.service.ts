@@ -91,4 +91,19 @@ export class AuthService {
       role: user.role,
     };
   }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      // For security, don't reveal if user exists, but we'll log it
+      console.log(`Password reset requested for non-existent email: ${email}`);
+    } else {
+      console.log(`Password reset requested for user: ${email}. In production, we would send an email here.`);
+    }
+
+    return { success: true, message: 'If an account exists with that email, a reset link has been sent.' };
+  }
 }

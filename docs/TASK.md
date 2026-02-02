@@ -187,11 +187,11 @@
 
 ### Demo Environment
 
-- [ ] Create database seed script
-- [ ] Generate realistic demo data
-- [ ] Set up demo customer accounts
-- [ ] Configure demo integrations
-- [ ] Populate sample evidence and checks
+- [x] Create database seed script
+- [x] Generate realistic demo data
+- [x] Set up demo customer accounts
+- [x] Configure demo integrations
+- [x] Populate sample evidence and checks
 
 ### Documentation
 

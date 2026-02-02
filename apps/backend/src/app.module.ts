@@ -16,6 +16,8 @@ import { SlackModule } from './integrations/slack/slack.module';
 import { IntegrationReliabilityModule } from './shared/reliability/integration-reliability.module';
 import { AuthModule } from './auth/auth.module';
 import { EvidenceModule } from './evidence/evidence.module';
+import { ComplianceModule } from './compliance/compliance.module';
+import { IntegrationsManagementModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -35,6 +37,8 @@ import { EvidenceModule } from './evidence/evidence.module';
     IntegrationReliabilityModule,
     AuthModule,
     EvidenceModule,
+    ComplianceModule,
+    IntegrationsManagementModule,
   ],
   controllers: [AppController],
   providers: [

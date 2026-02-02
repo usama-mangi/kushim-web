@@ -12,6 +12,18 @@ interface EvidenceViewerProps {
 }
 
 export function EvidenceViewer({ evidence }: EvidenceViewerProps) {
+  const handleDownload = () => {
+    const blob = new Blob([JSON.stringify(evidence.data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `evidence-${evidence.id.substring(0, 8)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -41,7 +53,7 @@ export function EvidenceViewer({ evidence }: EvidenceViewerProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Evidence Data</span>
-            <Button variant="ghost" size="sm" className="h-6">
+            <Button variant="ghost" size="sm" className="h-6" onClick={handleDownload}>
               <FileJson className="h-3 w-3 mr-1" />
               Download JSON
             </Button>

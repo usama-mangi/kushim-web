@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useDashboardStore } from "@/store/dashboard";
 import {
@@ -71,7 +72,7 @@ export function ControlStatus() {
   };
 
   return (
-    <Card>
+    <Card className="h-[500px] flex flex-col">
       <CardHeader>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
@@ -94,7 +95,7 @@ export function ControlStatus() {
               value={statusFilter}
               onValueChange={(value) => setStatusFilter(value as IntegrationStatus | "ALL")}
             >
-              <SelectTrigger className="w-[130px]">
+              <SelectTrigger className="w-fit">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -103,12 +104,13 @@ export function ControlStatus() {
                 <SelectItem value="PASS">Passing</SelectItem>
                 <SelectItem value="FAIL">Failing</SelectItem>
                 <SelectItem value="WARNING">Warning</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 overflow-auto pr-2 custom-scrollbar">
         {isLoading && controls.length === 0 ? (
           <div className="space-y-4">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -160,9 +162,11 @@ export function ControlStatus() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <Link href={`/controls/${control.id}`}>
+                          <Button variant="ghost" size="icon">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </Link>
                       </TableCell>
                     </TableRow>
                   ))

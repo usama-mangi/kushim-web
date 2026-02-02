@@ -50,6 +50,8 @@
     "class-transformer": "*",
     "class-validator": "*",
     "ioredis": "*",
+    "jspdf": "^4.1.0",
+    "jspdf-autotable": "^5.0.7",
     "p-queue": "*",
     "p-retry": "*",
     "passport-jwt": "^4.0.1",

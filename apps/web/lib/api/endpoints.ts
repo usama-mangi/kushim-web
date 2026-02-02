@@ -28,6 +28,26 @@ export async function getMe(): Promise<User> {
   return apiClient.get<User>("/auth/me");
 }
 
+export async function forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+  return apiClient.post<{ success: boolean; message: string }>("/auth/forgot-password", { email });
+}
+
+// ============================================================================
+// Compliance
+// ============================================================================
+
+export async function getControls(): Promise<any[]> {
+  return apiClient.get<any[]>("/compliance/controls");
+}
+
+export async function getControlDetails(id: string): Promise<any> {
+  return apiClient.get<any>(`/compliance/controls/${id}`);
+}
+
+export async function getRecentAlerts(): Promise<any[]> {
+  return apiClient.get<any[]>("/compliance/alerts");
+}
+
 // ============================================================================
 // Reliability / Overall Health
 // ============================================================================
@@ -132,4 +152,8 @@ export async function testSlackConnection(): Promise<{ success: boolean; message
 
 export async function sendSlackAlert(message: string): Promise<{ success: boolean }> {
   return apiClient.post<{ success: boolean }>("/integrations/slack/send-alert", { message });
+}
+
+export async function disconnectIntegrationByType(type: string): Promise<any> {
+  return apiClient.delete(`/integrations/type/${type}`);
 }

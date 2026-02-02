@@ -13,6 +13,8 @@ import {
   getOktaHealth,
   getJiraHealth,
   getSlackHealth,
+  getControls,
+  getRecentAlerts,
 } from "../lib/api/endpoints";
 
 interface DashboardState {
@@ -75,31 +77,53 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Fetch overall health
       const healthResponse = await getOverallHealth();
       
-      // Fetch individual integration health
-      const [aws, github, okta, jira, slack] = await Promise.all([
-        getAwsHealth().catch(() => null),
-        getGithubHealth().catch(() => null),
-        getOktaHealth().catch(() => null),
-        getJiraHealth().catch(() => null),
-        getSlackHealth().catch(() => null),
+      // Fetch controls and alerts
+      const [controls, alerts] = await Promise.all([
+        getControls().catch(() => []),
+        getRecentAlerts().catch(() => []),
       ]);
 
-      // Calculate compliance score from health metrics
-      const totalIntegrations = healthResponse.metrics.totalIntegrations;
-      const healthyCount = healthResponse.metrics.healthyIntegrations;
+      // Derive individual integration health from the overall metrics
+      const getHealthFor = (key: string): IntegrationHealth | null => {
+        const data = healthResponse.metrics.integrations[key];
+        if (!data) return null;
+        return {
+          integration: key,
+          healthScore: data.healthScore,
+          circuitBreaker: data.circuitBreaker,
+          timestamp: new Date(healthResponse.timestamp),
+        };
+      };
+
+      const aws = getHealthFor('aws');
+      const github = getHealthFor('github');
+      const okta = getHealthFor('okta');
+      const jira = getHealthFor('jira');
+      const slack = getHealthFor('slack');
+
+      // Calculate compliance score from actual controls
+      const totalControls = controls.length || 64; // Fallback to 64 if not loaded
+      const passingControls = controls.filter(c => c.status === 'PASS').length;
+      const failingControls = controls.filter(c => c.status === 'FAIL').length;
+      const warningControls = controls.filter(c => c.status === 'WARNING' || c.status === 'PENDING').length;
+      
+      const overall = totalControls > 0 ? passingControls / totalControls : 0;
+
       const complianceScore: ComplianceScore = {
-        overall: healthResponse.metrics.averageHealthScore,
-        trend: "stable", // TODO: Calculate trend from historical data
-        passingControls: healthyCount,
-        failingControls: healthResponse.metrics.unhealthyIntegrations,
-        warningControls: healthResponse.metrics.degradedIntegrations,
-        totalControls: totalIntegrations,
+        overall,
+        trend: "stable", 
+        passingControls,
+        failingControls,
+        warningControls,
+        totalControls,
       };
 
       set({
         overallHealth: healthResponse.metrics,
         integrationHealth: { aws, github, okta, jira, slack },
         complianceScore,
+        controls: controls || [],
+        alerts: alerts || [],
         lastRefresh: new Date(),
         isLoading: false,
         isRefreshing: false,
@@ -118,16 +142,27 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set({ isRefreshing: true, error: null });
 
     try {
-      const [aws, github, okta, jira, slack] = await Promise.all([
-        getAwsHealth().catch(() => null),
-        getGithubHealth().catch(() => null),
-        getOktaHealth().catch(() => null),
-        getJiraHealth().catch(() => null),
-        getSlackHealth().catch(() => null),
-      ]);
+      const healthResponse = await getOverallHealth();
+      
+      const getHealthFor = (key: string): IntegrationHealth | null => {
+        const data = healthResponse.metrics.integrations[key];
+        if (!data) return null;
+        return {
+          integration: key,
+          healthScore: data.healthScore,
+          circuitBreaker: data.circuitBreaker,
+          timestamp: new Date(healthResponse.timestamp),
+        };
+      };
 
       set({
-        integrationHealth: { aws, github, okta, jira, slack },
+        integrationHealth: {
+          aws: getHealthFor('aws'),
+          github: getHealthFor('github'),
+          okta: getHealthFor('okta'),
+          jira: getHealthFor('jira'),
+          slack: getHealthFor('slack'),
+        },
         isRefreshing: false,
       });
     } catch (error: any) {
