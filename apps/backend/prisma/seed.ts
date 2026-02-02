@@ -569,6 +569,18 @@ const controls = [
     category: 'Availability',
     integrationType: IntegrationType.AWS,
   },
+  
+  // --- Processing Integrity Criteria (PI) ---
+  {
+    framework: Framework.SOC2,
+    controlId: 'PI1.1.1',
+    title: 'Processing Integrity',
+    description: 'System processing is complete, valid, accurate, timely, and authorized.',
+    testProcedure: 'Review data processing logs and error rates.',
+    frequency: Frequency.DAILY,
+    category: 'Processing Integrity',
+    integrationType: IntegrationType.AWS, // Monitoring CloudWatch logs
+  },
 
   // --- Confidentiality Criteria (C) ---
   {
