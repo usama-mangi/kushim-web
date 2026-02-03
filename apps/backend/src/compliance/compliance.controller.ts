@@ -9,18 +9,16 @@ export class ComplianceController {
 
   @Get('controls')
   async getAllControls(@Request() req: any) {
-    // In MVP, we use user.id as customerId for demo purposes
-    // Better would be to have a customerId on the user object
-    return this.complianceService.getAllControls(req.user.id);
+    return this.complianceService.getAllControls(req.user.customerId);
   }
 
   @Get('controls/:id')
   async getControlDetails(@Param('id') id: string, @Request() req: any) {
-    return this.complianceService.getControlDetails(req.user.id, id);
+    return this.complianceService.getControlDetails(req.user.customerId, id);
   }
 
   @Get('alerts')
   async getRecentAlerts(@Request() req: any) {
-    return this.complianceService.getRecentAlerts(req.user.id);
+    return this.complianceService.getRecentAlerts(req.user.customerId);
   }
 }

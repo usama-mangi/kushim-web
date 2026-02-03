@@ -70,12 +70,22 @@ export class AwsService {
     });
   }
 
+  private getClientConfig(config?: any) {
+    if (!config) return null;
+    return {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+      region: config.region || this.configService.get('AWS_REGION', 'us-east-1'),
+    };
+  }
+
   /**
    * Collect IAM evidence - Check MFA enforcement
    * SOC 2 Control: CC6.1 (Logical Access Controls)
    */
-  async collectIamEvidence(credentials?: any) {
+  async collectIamEvidence(config?: any) {
     this.logger.log('Collecting IAM evidence...');
+    const credentials = this.getClientConfig(config);
     const client = this.getIamClient(credentials);
 
     return await this.circuitBreaker.execute(async () => {
@@ -124,8 +134,9 @@ export class AwsService {
    * Collect S3 evidence - Check bucket encryption
    * SOC 2 Control: CC6.7 (Encryption)
    */
-  async collectS3Evidence(credentials?: any) {
+  async collectS3Evidence(config?: any) {
     this.logger.log('Collecting S3 evidence...');
+    const credentials = this.getClientConfig(config);
     const client = this.getS3Client(credentials);
 
     return await this.circuitBreaker.execute(async () => {
@@ -135,6 +146,7 @@ export class AwsService {
         const bucketEncryptionStatus = await Promise.all(
           (buckets.Buckets || []).map(async (bucket) => {
             try {
+               // Use the scoped client for each bucket check
               const encryption = await client.send(
                 new GetBucketEncryptionCommand({ Bucket: bucket.Name }),
               );
@@ -219,8 +231,9 @@ export class AwsService {
    * Collect CloudTrail evidence - Check audit logging
    * SOC 2 Control: CC7.2 (System Monitoring)
    */
-  async collectCloudTrailEvidence(credentials?: any) {
+  async collectCloudTrailEvidence(config?: any) {
     this.logger.log('Collecting CloudTrail evidence...');
+    const credentials = this.getClientConfig(config);
     const client = this.getCloudTrailClient(credentials);
 
     return await this.circuitBreaker.execute(async () => {
@@ -267,12 +280,12 @@ export class AwsService {
   /**
    * Calculate overall health score for AWS integration
    */
-  async calculateHealthScore(credentials?: any): Promise<number> {
+  async calculateHealthScore(config?: any): Promise<number> {
     try {
       const [iamEvidence, s3Evidence, cloudTrailEvidence] = await Promise.all([
-        this.collectIamEvidence(credentials),
-        this.collectS3Evidence(credentials),
-        this.collectCloudTrailEvidence(credentials),
+        this.collectIamEvidence(config),
+        this.collectS3Evidence(config),
+        this.collectCloudTrailEvidence(config),
       ]);
 
       const scores = [

@@ -12,18 +12,16 @@ export class EvidenceController {
     @Param('controlId') controlId: string,
     @Request() req: any,
   ) {
-    // Assuming user.id maps to customerId in this MVP or we look up customer
-    // Simplification: use user.id as customerId for now
-    return this.evidenceService.getEvidenceByControl(req.user.id, controlId);
+    return this.evidenceService.getEvidenceByControl(req.user.customerId, controlId);
   }
 
   @Get(':id')
-  async getEvidence(@Param('id') id: string) {
-    return this.evidenceService.getEvidence(id);
+  async getEvidence(@Param('id') id: string, @Request() req: any) {
+    return this.evidenceService.getEvidence(req.user.customerId, id);
   }
 
   @Get(':id/verify')
-  async verifyEvidence(@Param('id') id: string) {
-    return this.evidenceService.verifyEvidence(id);
+  async verifyEvidence(@Param('id') id: string, @Request() req: any) {
+    return this.evidenceService.verifyEvidence(req.user.customerId, id);
   }
 }

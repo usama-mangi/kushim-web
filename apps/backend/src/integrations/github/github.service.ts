@@ -14,6 +14,15 @@ export class GitHubService {
     this.defaultOctokit = new Octokit({ auth: token });
   }
 
+  private getClientConfig(config?: any) {
+    if (!config) return null;
+    return {
+      owner: config.owner || config.organization,
+      repo: config.repo || 'kushim-web',
+      token: config.token || config.personalAccessToken,
+    };
+  }
+
   private getOctokit(token?: string): Octokit {
     if (!token) return this.defaultOctokit;
     return new Octokit({ auth: token });
@@ -22,9 +31,10 @@ export class GitHubService {
   /**
    * Check connection validity (Health Check)
    */
-  async checkConnection(token?: string): Promise<boolean> {
+  async checkConnection(config?: any): Promise<boolean> {
     try {
-      const octokit = this.getOctokit(token);
+      const clientConfig = this.getClientConfig(config);
+      const octokit = this.getOctokit(clientConfig?.token);
       await octokit.users.getAuthenticated();
       return true;
     } catch (error) {
@@ -37,7 +47,12 @@ export class GitHubService {
    * Collect branch protection evidence
    * SOC 2 Control: CC8.1 (Change Management)
    */
-  async collectBranchProtectionEvidence(owner: string, repo: string, token?: string) {
+  async collectBranchProtectionEvidence(config?: any) {
+    const clientConfig = this.getClientConfig(config);
+    const owner = clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
+    const repo = clientConfig?.repo || this.configService.get('GITHUB_REPO', '');
+    const token = clientConfig?.token;
+
     this.logger.log(`Collecting branch protection evidence for ${owner}/${repo}...`);
     const octokit = this.getOctokit(token);
 
@@ -119,7 +134,12 @@ export class GitHubService {
    * Collect commit signing evidence
    * SOC 2 Control: CC6.2 (Authentication)
    */
-  async collectCommitSigningEvidence(owner: string, repo: string, token?: string) {
+  async collectCommitSigningEvidence(config?: any) {
+    const clientConfig = this.getClientConfig(config);
+    const owner = clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
+    const repo = clientConfig?.repo || this.configService.get('GITHUB_REPO', '');
+    const token = clientConfig?.token;
+
     this.logger.log(`Collecting commit signing evidence for ${owner}/${repo}...`);
     const octokit = this.getOctokit(token);
 
@@ -169,7 +189,12 @@ export class GitHubService {
    * Collect repository security evidence
    * SOC 2 Control: CC7.2 (System Monitoring)
    */
-  async collectSecurityEvidence(owner: string, repo: string, token?: string) {
+  async collectSecurityEvidence(config?: any) {
+    const clientConfig = this.getClientConfig(config);
+    const owner = clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
+    const repo = clientConfig?.repo || this.configService.get('GITHUB_REPO', '');
+    const token = clientConfig?.token;
+
     this.logger.log(`Collecting security evidence for ${owner}/${repo}...`);
     const octokit = this.getOctokit(token);
 
@@ -216,12 +241,12 @@ export class GitHubService {
   /**
    * Calculate overall health score for GitHub integration
    */
-  async calculateHealthScore(owner: string, repo: string, token?: string): Promise<number> {
+  async calculateHealthScore(config?: any): Promise<number> {
     try {
       const [branchProtection, commitSigning, security] = await Promise.all([
-        this.collectBranchProtectionEvidence(owner, repo, token),
-        this.collectCommitSigningEvidence(owner, repo, token),
-        this.collectSecurityEvidence(owner, repo, token),
+        this.collectBranchProtectionEvidence(config),
+        this.collectCommitSigningEvidence(config),
+        this.collectSecurityEvidence(config),
       ]);
 
       const scores = [

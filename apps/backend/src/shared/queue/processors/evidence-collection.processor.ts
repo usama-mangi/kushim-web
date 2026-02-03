@@ -7,6 +7,7 @@ import { AwsService } from '../../../integrations/aws/aws.service';
 import { GitHubService } from '../../../integrations/github/github.service';
 import { OktaService } from '../../../integrations/okta/okta.service';
 import * as crypto from 'crypto';
+import { decrypt } from '../../utils/encryption.util';
 
 interface EvidenceCollectionJobData {
   customerId: string;
@@ -25,6 +26,33 @@ export class EvidenceCollectionProcessor {
     private readonly githubService: GitHubService,
     private readonly oktaService: OktaService,
   ) {}
+
+  /**
+   * Decrypt sensitive fields in integration config
+   */
+  private decryptConfig(config: any): any {
+    if (!config) return config;
+    const decrypted = { ...config };
+    const sensitiveKeys = [
+      'personalAccessToken',
+      'token',
+      'secretAccessKey',
+      'apiToken',
+      'webhookUrl',
+      'secret',
+    ];
+
+    for (const key of sensitiveKeys) {
+      if (decrypted[key] && typeof decrypted[key] === 'string' && decrypted[key].includes(':')) {
+        try {
+          decrypted[key] = decrypt(decrypted[key]);
+        } catch (error) {
+          this.logger.error(`Failed to decrypt field ${key}:`, error.message);
+        }
+      }
+    }
+    return decrypted;
+  }
 
   @Process(EvidenceCollectionJobType.COLLECT_AWS)
   async handleAwsCollection(job: Job<EvidenceCollectionJobData>) {
@@ -53,7 +81,7 @@ export class EvidenceCollectionProcessor {
       }
 
       let evidenceData: any;
-      const credentials = integration.config;
+      const credentials = this.decryptConfig(integration.config);
 
       switch (control.controlId) {
         case 'CC6.1':
@@ -122,20 +150,12 @@ export class EvidenceCollectionProcessor {
       }
 
       let evidenceData: any;
-      const config = integration.config as any;
+      const config = this.decryptConfig(integration.config);
 
       if (control.controlId === 'CC7.2') {
-          evidenceData = await this.githubService.collectBranchProtectionEvidence(
-              config.owner, 
-              config.repo, 
-              config.token
-          );
+          evidenceData = await this.githubService.collectBranchProtectionEvidence(config);
       } else {
-          evidenceData = await this.githubService.collectBranchProtectionEvidence(
-              config.owner, 
-              config.repo, 
-              config.token
-          );
+          evidenceData = await this.githubService.collectBranchProtectionEvidence(config);
       }
 
       const savedEvidence = await this.storeEvidence(
@@ -176,7 +196,7 @@ export class EvidenceCollectionProcessor {
         throw new Error(`Control ${controlId} not found`);
       }
 
-      const config = integration.config as any;
+      const config = this.decryptConfig(integration.config);
       let evidenceData: any;
 
       switch (control.controlId) {

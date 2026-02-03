@@ -31,6 +31,7 @@ async function main() {
     where: { email: 'admin@kushim.io' },
     update: {
       password: hashedPassword,
+      customerId: customerId,
     },
     create: {
       email: 'admin@kushim.io',
@@ -38,6 +39,7 @@ async function main() {
       firstName: 'Demo',
       lastName: 'Admin',
       role: 'admin',
+      customerId: customerId,
     },
   });
 

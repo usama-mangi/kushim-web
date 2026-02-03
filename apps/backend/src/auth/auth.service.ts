@@ -25,7 +25,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload = { sub: foundUser.id, email: foundUser.email, role: foundUser.role };
+    const payload = { 
+      sub: foundUser.id, 
+      email: foundUser.email, 
+      role: foundUser.role,
+      customerId: foundUser.customerId 
+    };
     
     return {
       token: this.jwtService.sign(payload),
@@ -35,6 +40,7 @@ export class AuthService {
         firstName: foundUser.firstName,
         lastName: foundUser.lastName,
         role: foundUser.role,
+        customerId: foundUser.customerId,
       },
     };
   }
@@ -50,6 +56,14 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(user.password, 10);
 
+    // Create a new Customer for this user (Multi-tenancy)
+    const customer = await this.prisma.customer.create({
+      data: {
+        name: `${user.firstName || 'New'} ${user.lastName || 'User'}'s Org`,
+        email: user.email,
+      },
+    });
+
     const newUser = await this.prisma.user.create({
       data: {
         email: user.email,
@@ -57,10 +71,16 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: 'user',
+        customerId: customer.id,
       },
     });
 
-    const payload = { sub: newUser.id, email: newUser.email, role: newUser.role };
+    const payload = { 
+      sub: newUser.id, 
+      email: newUser.email, 
+      role: newUser.role,
+      customerId: newUser.customerId 
+    };
 
     return {
       token: this.jwtService.sign(payload),
@@ -70,6 +90,7 @@ export class AuthService {
         firstName: newUser.firstName,
         lastName: newUser.lastName,
         role: newUser.role,
+        customerId: newUser.customerId,
       },
     };
   }
@@ -89,6 +110,7 @@ export class AuthService {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
+      customerId: user.customerId,
     };
   }
 

@@ -17,10 +17,12 @@ import {
 } from "@/components/ui/form";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { connectIntegration } from "@/lib/api/endpoints";
 
 const formSchema = z.object({
   personalAccessToken: z.string().min(10, "Token is too short"),
   organization: z.string().min(1, "Organization name is required"),
+  repo: z.string().optional(),
 });
 
 export function GithubConnectionForm({ onSuccess }: { onSuccess?: () => void }) {
@@ -33,6 +35,7 @@ export function GithubConnectionForm({ onSuccess }: { onSuccess?: () => void }) 
     defaultValues: {
       personalAccessToken: "",
       organization: "",
+      repo: "kushim-web", // Default repo for testing if needed
     },
   });
 
@@ -42,10 +45,7 @@ export function GithubConnectionForm({ onSuccess }: { onSuccess?: () => void }) 
     setErrorMessage("");
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
-      console.log("Saving GitHub credentials:", values);
+      await connectIntegration("GITHUB", values);
       
       setConnectionStatus("success");
       if (onSuccess) {

@@ -17,9 +17,10 @@ import {
 } from "@/components/ui/form";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { connectIntegration } from "@/lib/api/endpoints";
 
 const formSchema = z.object({
-  domain: z.string().url("Must be a valid URL").includes("atlassian.net", { message: "Must be an atlassian.net domain" }),
+  domain: z.string().min(3, "Domain is required"),
   email: z.string().email("Must be a valid email"),
   apiToken: z.string().min(10, "Token is too short"),
   projectKey: z.string().min(2, "Project Key is required").max(10, "Project Key is too long"),
@@ -46,10 +47,16 @@ export function JiraConnectionForm({ onSuccess }: { onSuccess?: () => void }) {
     setErrorMessage("");
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
-      console.log("Saving Jira credentials:", values);
+      // Normalize domain
+      const normalizedDomain = values.domain
+        .replace("https://", "")
+        .replace("http://", "")
+        .split("/")[0];
+
+      await connectIntegration("JIRA", {
+        ...values,
+        domain: normalizedDomain,
+      });
       
       setConnectionStatus("success");
       if (onSuccess) {

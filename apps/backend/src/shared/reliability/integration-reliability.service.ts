@@ -1,10 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
 import { AwsService } from '../../integrations/aws/aws.service';
 import { GitHubService } from '../../integrations/github/github.service';
 import { OktaService } from '../../integrations/okta/okta.service';
 import { JiraService } from '../../integrations/jira/jira.service';
 import { SlackService } from '../../integrations/slack/slack.service';
+import { IntegrationType } from '@prisma/client';
+import { decrypt } from '../utils/encryption.util';
 
 export interface IntegrationHealth {
   integration: string;
@@ -32,6 +35,7 @@ export class IntegrationReliabilityService {
   private readonly logger = new Logger(IntegrationReliabilityService.name);
 
   constructor(
+    private prisma: PrismaService,
     private configService: ConfigService,
     private awsService: AwsService,
     private githubService: GitHubService,
@@ -43,15 +47,15 @@ export class IntegrationReliabilityService {
   /**
    * Check health of all integrations
    */
-  async checkAllIntegrationsHealth(): Promise<IntegrationReliabilityMetrics> {
-    this.logger.log('Checking health of all integrations...');
+  async checkAllIntegrationsHealth(customerId: string): Promise<IntegrationReliabilityMetrics> {
+    this.logger.log(`Checking health of all integrations for customer ${customerId}...`);
 
     const integrationChecks = await Promise.allSettled([
-      this.checkAwsHealth(),
-      this.checkGitHubHealth(),
-      this.checkOktaHealth(),
-      this.checkJiraHealth(),
-      this.checkSlackHealth(),
+      this.checkAwsHealth(customerId),
+      this.checkGitHubHealth(customerId),
+      this.checkOktaHealth(customerId),
+      this.checkJiraHealth(customerId),
+      this.checkSlackHealth(customerId),
     ]);
 
     const integrationList: IntegrationHealth[] = integrationChecks.map((result, index) => {
@@ -101,11 +105,54 @@ export class IntegrationReliabilityService {
   }
 
   /**
+   * Decrypt sensitive fields in integration config
+   */
+  private decryptConfig(config: any): any {
+    if (!config) return config;
+    const decrypted = { ...config };
+    const sensitiveKeys = [
+      'personalAccessToken',
+      'token',
+      'secretAccessKey',
+      'apiToken',
+      'webhookUrl',
+      'secret',
+    ];
+
+    for (const key of sensitiveKeys) {
+      if (decrypted[key] && typeof decrypted[key] === 'string' && decrypted[key].includes(':')) {
+        try {
+          decrypted[key] = decrypt(decrypted[key]);
+        } catch (error) {
+          this.logger.error(`Failed to decrypt field ${key}:`, error.message);
+        }
+      }
+    }
+    return decrypted;
+  }
+
+  /**
    * Check AWS integration health
    */
-  private async checkAwsHealth(): Promise<IntegrationHealth> {
+  private async checkAwsHealth(customerId: string): Promise<IntegrationHealth> {
     try {
-      const healthScore = await this.awsService.calculateHealthScore();
+      const integration = await this.prisma.integration.findFirst({
+        where: { customerId, type: IntegrationType.AWS }
+      });
+
+      if (!integration) {
+        return {
+          integration: 'aws',
+          status: 'unhealthy',
+          healthScore: 0,
+          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
+          lastChecked: new Date(),
+          details: { note: 'No integration configured' }
+        };
+      }
+
+      const config = this.decryptConfig(integration.config);
+      const healthScore = await this.awsService.calculateHealthScore(config);
       const circuitBreaker = this.awsService.getCircuitBreakerStatus();
 
       return {
@@ -127,24 +174,28 @@ export class IntegrationReliabilityService {
   /**
    * Check GitHub integration health
    */
-  private async checkGitHubHealth(): Promise<IntegrationHealth> {
+  private async checkGitHubHealth(customerId: string): Promise<IntegrationHealth> {
     try {
-      const owner = this.configService.get('GITHUB_OWNER');
-      const repo = this.configService.get('GITHUB_REPO');
-      const circuitBreaker = this.githubService.getCircuitBreakerStatus();
-      let healthScore = 0;
-      let status: 'healthy' | 'degraded' | 'unhealthy' = 'unhealthy';
-      let details: any = {};
+      const integration = await this.prisma.integration.findFirst({
+        where: { customerId, type: IntegrationType.GITHUB }
+      });
 
-      if (owner && repo) {
-        healthScore = await this.githubService.calculateHealthScore(owner, repo);
-        status = this.determineStatus(healthScore, circuitBreaker.failureCount);
-      } else {
-        const isConnected = await this.githubService.checkConnection();
-        status = isConnected ? 'healthy' : 'unhealthy';
-        healthScore = isConnected ? 1 : 0;
-        details = { note: 'Basic connection check (Repo details not configured)' };
+      if (!integration) {
+        return {
+          integration: 'github',
+          status: 'unhealthy',
+          healthScore: 0,
+          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
+          lastChecked: new Date(),
+          details: { note: 'No integration configured' }
+        };
       }
+
+      const config = this.decryptConfig(integration.config);
+      const circuitBreaker = this.githubService.getCircuitBreakerStatus();
+      
+      const healthScore = await this.githubService.calculateHealthScore(config);
+      const status = this.determineStatus(healthScore, circuitBreaker.failureCount);
 
       return {
         integration: 'github',
@@ -155,7 +206,6 @@ export class IntegrationReliabilityService {
             failureCount: circuitBreaker.failureCount
         },
         lastChecked: new Date(),
-        details,
       };
     } catch (error) {
       this.logger.error('Failed to check GitHub health:', error);
@@ -166,9 +216,25 @@ export class IntegrationReliabilityService {
   /**
    * Check Okta integration health
    */
-  private async checkOktaHealth(): Promise<IntegrationHealth> {
+  private async checkOktaHealth(customerId: string): Promise<IntegrationHealth> {
     try {
-      const healthScore = await this.oktaService.calculateHealthScore();
+      const integration = await this.prisma.integration.findFirst({
+        where: { customerId, type: IntegrationType.OKTA }
+      });
+
+      if (!integration) {
+        return {
+          integration: 'okta',
+          status: 'unhealthy',
+          healthScore: 0,
+          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
+          lastChecked: new Date(),
+          details: { note: 'No integration configured' }
+        };
+      }
+
+      const config = this.decryptConfig(integration.config);
+      const healthScore = await this.oktaService.calculateHealthScore(config);
       const circuitBreaker = this.oktaService.getCircuitBreakerStatus();
 
       return {
@@ -190,10 +256,26 @@ export class IntegrationReliabilityService {
   /**
    * Check Jira integration health
    */
-  private async checkJiraHealth(): Promise<IntegrationHealth> {
+  private async checkJiraHealth(customerId: string): Promise<IntegrationHealth> {
     try {
+      const integration = await this.prisma.integration.findFirst({
+        where: { customerId, type: IntegrationType.JIRA }
+      });
+
+      if (!integration) {
+        return {
+          integration: 'jira',
+          status: 'unhealthy',
+          healthScore: 0,
+          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
+          lastChecked: new Date(),
+          details: { note: 'No integration configured' }
+        };
+      }
+
+      const config = this.decryptConfig(integration.config);
       const circuitBreaker = this.jiraService.getCircuitBreakerStatus();
-      const isConnected = await this.jiraService.checkConnection();
+      const isConnected = await this.jiraService.checkConnection(config);
       
       const status = isConnected && circuitBreaker.state !== 'OPEN' ? 'healthy' : 'unhealthy';
 
@@ -216,10 +298,26 @@ export class IntegrationReliabilityService {
   /**
    * Check Slack integration health
    */
-  private async checkSlackHealth(): Promise<IntegrationHealth> {
+  private async checkSlackHealth(customerId: string): Promise<IntegrationHealth> {
     try {
+      const integration = await this.prisma.integration.findFirst({
+        where: { customerId, type: IntegrationType.SLACK }
+      });
+
+      if (!integration) {
+        return {
+          integration: 'slack',
+          status: 'unhealthy',
+          healthScore: 0,
+          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
+          lastChecked: new Date(),
+          details: { note: 'No integration configured' }
+        };
+      }
+
+      const config = this.decryptConfig(integration.config);
       const circuitBreaker = this.slackService.getCircuitBreakerStatus();
-      const isConnected = await this.slackService.checkConnection();
+      const isConnected = await this.slackService.checkConnection(config.webhookUrl);
 
       const status = isConnected && circuitBreaker.state !== 'OPEN' ? 'healthy' : 'unhealthy';
 

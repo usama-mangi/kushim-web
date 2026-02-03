@@ -6,9 +6,9 @@ import * as crypto from 'crypto';
 export class EvidenceService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getEvidence(id: string) {
-    const evidence = await this.prisma.evidence.findUnique({
-      where: { id },
+  async getEvidence(customerId: string, id: string) {
+    const evidence = await this.prisma.evidence.findFirst({
+      where: { id, customerId },
       include: {
         control: true,
         integration: true,
@@ -33,8 +33,8 @@ export class EvidenceService {
     });
   }
 
-  async verifyEvidence(id: string) {
-    const evidence = await this.getEvidence(id);
+  async verifyEvidence(customerId: string, id: string) {
+    const evidence = await this.getEvidence(customerId, id);
 
     // Reconstruct hash payload
     // Note: detailed verification requires ensuring the timestamp matches exactly.

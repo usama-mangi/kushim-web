@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { connectIntegration } from "@/lib/api/endpoints";
 
 const formSchema = z.object({
   webhookUrl: z.string().url("Must be a valid URL").startsWith("https://hooks.slack.com/", { message: "Must be a Slack webhook URL" }),
@@ -42,10 +43,7 @@ export function SlackConnectionForm({ onSuccess }: { onSuccess?: () => void }) {
     setErrorMessage("");
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
-      console.log("Saving Slack credentials:", values);
+      await connectIntegration("SLACK", values);
       
       setConnectionStatus("success");
       if (onSuccess) {

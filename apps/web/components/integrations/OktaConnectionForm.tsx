@@ -17,9 +17,10 @@ import {
 } from "@/components/ui/form";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { connectIntegration } from "@/lib/api/endpoints";
 
 const formSchema = z.object({
-  domain: z.string().url("Must be a valid URL").includes("okta.com", { message: "Must be an okta.com domain" }),
+  domain: z.string().url("Must be a valid URL"),
   apiToken: z.string().min(10, "Token is too short"),
 });
 
@@ -42,10 +43,10 @@ export function OktaConnectionForm({ onSuccess }: { onSuccess?: () => void }) {
     setErrorMessage("");
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
-      console.log("Saving Okta credentials:", values);
+      await connectIntegration("OKTA", {
+        orgUrl: values.domain,
+        token: values.apiToken,
+      });
       
       setConnectionStatus("success");
       if (onSuccess) {

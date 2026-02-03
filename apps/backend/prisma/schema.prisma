@@ -12,14 +12,17 @@ datasource db {
 
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  role      String   @default("user")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String
+  firstName  String
+  lastName   String
+  role       String   @default("user")
+  customerId String?  @map("customer_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@map("users")
 }
@@ -34,6 +37,7 @@ model Customer {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  users             User[]
   integrations      Integration[]
   complianceChecks  ComplianceCheck[]
   evidence          Evidence[]

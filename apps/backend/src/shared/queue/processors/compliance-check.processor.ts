@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { JiraService } from '../../../integrations/jira/jira.service';
 import { SlackService } from '../../../integrations/slack/slack.service';
 import { CheckStatus, Frequency, IntegrationType } from '@prisma/client';
+import { decrypt } from '../../utils/encryption.util';
 
 interface ComplianceCheckJobData {
   customerId: string;
@@ -25,6 +26,33 @@ export class ComplianceCheckProcessor {
     @InjectQueue(QueueName.COMPLIANCE_CHECK) private complianceQueue: Queue,
     @InjectQueue(QueueName.EVIDENCE_COLLECTION) private evidenceQueue: Queue,
   ) {}
+
+  /**
+   * Decrypt sensitive fields in integration config
+   */
+  private decryptConfig(config: any): any {
+    if (!config) return config;
+    const decrypted = { ...config };
+    const sensitiveKeys = [
+      'personalAccessToken',
+      'token',
+      'secretAccessKey',
+      'apiToken',
+      'webhookUrl',
+      'secret',
+    ];
+
+    for (const key of sensitiveKeys) {
+      if (decrypted[key] && typeof decrypted[key] === 'string' && decrypted[key].includes(':')) {
+        try {
+          decrypted[key] = decrypt(decrypted[key]);
+        } catch (error) {
+          this.logger.error(`Failed to decrypt field ${key}:`, error.message);
+        }
+      }
+    }
+    return decrypted;
+  }
 
   @Process(ComplianceCheckJobType.RUN_CHECK)
   async handleRunCheck(job: Job<ComplianceCheckJobData>) {
@@ -182,13 +210,19 @@ export class ComplianceCheckProcessor {
       evidenceData: any
   ) {
     // A. Slack Alert
-    // Get integration to find webhook if needed? For now using default env
+    // Get integration to find webhook if available for this customer
+    const slackIntegration = await this.prisma.integration.findFirst({
+        where: { customerId, type: IntegrationType.SLACK, status: 'ACTIVE' },
+    });
+    const slackConfig = slackIntegration ? this.decryptConfig(slackIntegration.config) : null;
+
     await this.slackService.sendAlert({
         title: `:rotating_light: Compliance Control Failed: ${control.title}`,
         message: `Control ${control.controlId} failed validation.\nReason: ${evidenceData.status}\nIntegration: ${evidence.integration.type}`,
         severity: 'error',
         controlId: control.controlId,
-        evidenceId: evidence.id
+        evidenceId: evidence.id,
+        webhookUrl: slackConfig?.webhookUrl
     });
 
     // B. Jira Ticket (The Secret Weapon)
@@ -198,7 +232,7 @@ export class ComplianceCheckProcessor {
     });
 
     if (jiraIntegration) {
-        const config = jiraIntegration.config as any; // { domain, email, apiToken, projectKey }
+        const config = this.decryptConfig(jiraIntegration.config);
         
         // Check if we already have an open task for this failure to avoid duplicates?
         // For simplicity, create a new one for now (or could check JiraTasks table)
