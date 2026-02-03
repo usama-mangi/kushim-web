@@ -1,8 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { GitHubService } from './github.service';
 import { GitHubController } from './github.controller';
+import { IntegrationsManagementModule } from '../integrations.module';
 
 @Module({
+  imports: [forwardRef(() => IntegrationsManagementModule)],
   providers: [GitHubService],
   controllers: [GitHubController],
   exports: [GitHubService],
