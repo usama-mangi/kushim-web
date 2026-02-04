@@ -48,6 +48,17 @@ export class IntegrationReliabilityService {
    * Check health of all integrations
    */
   async checkAllIntegrationsHealth(customerId: string): Promise<IntegrationReliabilityMetrics> {
+    if (!customerId) {
+        this.logger.warn('Attempted to check integration health without a valid customerId');
+        return {
+            totalIntegrations: 0,
+            healthyIntegrations: 0,
+            degradedIntegrations: 0,
+            unhealthyIntegrations: 0,
+            averageHealthScore: 0,
+            integrations: {},
+        };
+    }
     this.logger.log(`Checking health of all integrations for customer ${customerId}...`);
 
     const integrationChecks = await Promise.allSettled([

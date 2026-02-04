@@ -44,52 +44,34 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Kushim Compliance Dashboard</h1>
-              <p className="text-muted-foreground mt-1">
-                Real-time compliance monitoring and automation
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              {lastRefresh && (
-                <span className="text-sm text-muted-foreground mr-4">
-                  Last updated {formatRelativeTime(lastRefresh)}
+    <div className="min-h-screen bg-background pb-12">
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">System Overview</h1>
+            <p className="text-muted-foreground mt-1">
+              Real-time compliance monitoring and automated evidence collection
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+             {lastRefresh && (
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                  Updated {formatRelativeTime(lastRefresh)}
                 </span>
               )}
-              <Link href="/integrations">
-                <Button variant="outline" size="sm" className="mr-2">
-                  Integrations
-                </Button>
-              </Link>
-              <Link href="/reports">
-                <Button variant="outline" size="sm" className="mr-2">
-                  Reports
-                </Button>
-              </Link>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
+                className="h-9 px-4 shrink-0"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-                Refresh
+                <RefreshCw className={`h-3.5 w-3.5 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+                Sync Now
               </Button>
-              <div className="ml-2 pl-2 border-l">
-                 <LogoutButton />
-              </div>
-            </div>
           </div>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
         {/* Error Alert */}
         {error && (
           <Alert variant="destructive" className="mb-6">
