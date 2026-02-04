@@ -11,16 +11,16 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Settings, ExternalLink, CheckCircle, AlertCircle } from "lucide-react";
+import { getOAuthAuthorizeUrl } from "@/lib/api/endpoints";
+import { toast } from "sonner";
 
 interface IntegrationCardProps {
   id: string;
@@ -46,6 +46,21 @@ export function IntegrationCard({
   connectionForm,
 }: IntegrationCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  const isOAuthPlatform = ["github", "slack", "jira", "okta"].includes(id.toLowerCase());
+
+  const handleOAuthConnect = async () => {
+    try {
+      setIsConnecting(true);
+      const { url } = await getOAuthAuthorizeUrl(id);
+      window.location.href = url;
+    } catch (error) {
+      console.error(`Failed to start OAuth flow for ${id}:`, error);
+      toast.error(`Failed to connect ${name}. Please try again.`);
+      setIsConnecting(false);
+    }
+  };
 
   return (
     <Card className="flex flex-col h-full">
@@ -95,36 +110,46 @@ export function IntegrationCard({
         )}
       </CardContent>
       <CardFooter className="pt-4 border-t bg-muted/20">
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <div className="flex w-full items-center justify-between gap-2">
-            {isConnected ? (
-              <>
+        <div className="flex w-full items-center justify-between gap-2">
+          {isConnected ? (
+            <>
+              {!isOAuthPlatform ? (
                 <Button variant="outline" size="sm" onClick={() => setIsDialogOpen(true)}>
                   <Settings className="w-4 h-4 mr-2" />
                   Configure
                 </Button>
-                <Button variant="destructive" size="sm" onClick={onDisconnect}>
-                  Disconnect
-                </Button>
-              </>
-            ) : (
-              <DialogTrigger asChild>
-                <Button className="w-full">
-                  Connect {name}
-                </Button>
-              </DialogTrigger>
-            )}
-          </div>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Connect {name}</DialogTitle>
-              <DialogDescription>
-                Enter your credentials to connect with {name}. Your secrets are encrypted and stored securely.
-              </DialogDescription>
-            </DialogHeader>
-            {connectionForm}
-          </DialogContent>
-        </Dialog>
+              ) : (
+                <div /> // Spacer
+              )}
+              <Button variant="destructive" size="sm" onClick={onDisconnect}>
+                Disconnect
+              </Button>
+            </>
+          ) : isOAuthPlatform ? (
+            <Button className="w-full" onClick={handleOAuthConnect} disabled={isConnecting}>
+              {isConnecting ? "Connecting..." : `Connect ${name} via OAuth`}
+            </Button>
+          ) : (
+            <Button className="w-full" onClick={() => setIsDialogOpen(true)}>
+              Connect {name}
+            </Button>
+          )}
+        </div>
+
+        {/* Form-based dialog (fallback/manual) */}
+        {!isOAuthPlatform && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Connect {name}</DialogTitle>
+                <DialogDescription>
+                  Enter your credentials to connect with {name}. Your secrets are encrypted and stored securely.
+                </DialogDescription>
+              </DialogHeader>
+              {connectionForm}
+            </DialogContent>
+          </Dialog>
+        )}
       </CardFooter>
     </Card>
   );

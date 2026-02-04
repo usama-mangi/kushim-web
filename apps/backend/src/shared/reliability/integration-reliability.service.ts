@@ -69,24 +69,26 @@ export class IntegrationReliabilityService {
       this.checkSlackHealth(customerId),
     ]);
 
-    const integrationList: IntegrationHealth[] = integrationChecks.map((result, index) => {
-      if (result.status === 'fulfilled') {
-        return result.value;
-      } else {
-        const integrationNames = ['aws', 'github', 'okta', 'jira', 'slack'];
-        return {
-          integration: integrationNames[index],
-          status: 'unhealthy' as const,
-          healthScore: 0,
-          circuitBreaker: {
-            state: 'OPEN',
-            failureCount: 999,
-          },
-          lastChecked: new Date(),
-          details: { error: result.reason?.message || 'Unknown error' },
-        };
-      }
-    });
+    const integrationList: IntegrationHealth[] = integrationChecks
+      .map((result, index) => {
+        if (result.status === 'fulfilled') {
+          return result.value;
+        } else {
+          const integrationNames = ['aws', 'github', 'okta', 'jira', 'slack'];
+          return {
+            integration: integrationNames[index],
+            status: 'unhealthy' as const,
+            healthScore: 0,
+            circuitBreaker: {
+              state: 'OPEN',
+              failureCount: 999,
+            },
+            lastChecked: new Date(),
+            details: { error: result.reason?.message || 'Unknown error' },
+          };
+        }
+      })
+      .filter((i): i is IntegrationHealth => i !== null);
 
     const healthyIntegrations = integrationList.filter((i) => i.status === 'healthy').length;
     const degradedIntegrations = integrationList.filter((i) => i.status === 'degraded').length;
@@ -145,21 +147,14 @@ export class IntegrationReliabilityService {
   /**
    * Check AWS integration health
    */
-  private async checkAwsHealth(customerId: string): Promise<IntegrationHealth> {
+  private async checkAwsHealth(customerId: string): Promise<IntegrationHealth | null> {
     try {
       const integration = await this.prisma.integration.findFirst({
         where: { customerId, type: IntegrationType.AWS }
       });
 
       if (!integration) {
-        return {
-          integration: 'aws',
-          status: 'unhealthy',
-          healthScore: 0,
-          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
-          lastChecked: new Date(),
-          details: { note: 'No integration configured' }
-        };
+        return null;
       }
 
       const config = this.decryptConfig(integration.config);
@@ -185,21 +180,14 @@ export class IntegrationReliabilityService {
   /**
    * Check GitHub integration health
    */
-  private async checkGitHubHealth(customerId: string): Promise<IntegrationHealth> {
+  private async checkGitHubHealth(customerId: string): Promise<IntegrationHealth | null> {
     try {
       const integration = await this.prisma.integration.findFirst({
         where: { customerId, type: IntegrationType.GITHUB }
       });
 
       if (!integration) {
-        return {
-          integration: 'github',
-          status: 'unhealthy',
-          healthScore: 0,
-          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
-          lastChecked: new Date(),
-          details: { note: 'No integration configured' }
-        };
+        return null;
       }
 
       const config = this.decryptConfig(integration.config);
@@ -227,21 +215,14 @@ export class IntegrationReliabilityService {
   /**
    * Check Okta integration health
    */
-  private async checkOktaHealth(customerId: string): Promise<IntegrationHealth> {
+  private async checkOktaHealth(customerId: string): Promise<IntegrationHealth | null> {
     try {
       const integration = await this.prisma.integration.findFirst({
         where: { customerId, type: IntegrationType.OKTA }
       });
 
       if (!integration) {
-        return {
-          integration: 'okta',
-          status: 'unhealthy',
-          healthScore: 0,
-          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
-          lastChecked: new Date(),
-          details: { note: 'No integration configured' }
-        };
+        return null;
       }
 
       const config = this.decryptConfig(integration.config);
@@ -267,21 +248,14 @@ export class IntegrationReliabilityService {
   /**
    * Check Jira integration health
    */
-  private async checkJiraHealth(customerId: string): Promise<IntegrationHealth> {
+  private async checkJiraHealth(customerId: string): Promise<IntegrationHealth | null> {
     try {
       const integration = await this.prisma.integration.findFirst({
         where: { customerId, type: IntegrationType.JIRA }
       });
 
       if (!integration) {
-        return {
-          integration: 'jira',
-          status: 'unhealthy',
-          healthScore: 0,
-          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
-          lastChecked: new Date(),
-          details: { note: 'No integration configured' }
-        };
+        return null;
       }
 
       const config = this.decryptConfig(integration.config);
@@ -309,21 +283,14 @@ export class IntegrationReliabilityService {
   /**
    * Check Slack integration health
    */
-  private async checkSlackHealth(customerId: string): Promise<IntegrationHealth> {
+  private async checkSlackHealth(customerId: string): Promise<IntegrationHealth | null> {
     try {
       const integration = await this.prisma.integration.findFirst({
         where: { customerId, type: IntegrationType.SLACK }
       });
 
       if (!integration) {
-        return {
-          integration: 'slack',
-          status: 'unhealthy',
-          healthScore: 0,
-          circuitBreaker: { state: 'CLOSED', failureCount: 0 },
-          lastChecked: new Date(),
-          details: { note: 'No integration configured' }
-        };
+        return null;
       }
 
       const config = this.decryptConfig(integration.config);

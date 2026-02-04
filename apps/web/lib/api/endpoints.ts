@@ -161,6 +161,9 @@ export async function sendSlackAlert(message: string): Promise<{ success: boolea
 export async function disconnectIntegrationByType(type: string): Promise<any> {
   return apiClient.delete(`/integrations/type/${type}`);
 }
+export async function getOAuthAuthorizeUrl(platform: string): Promise<{ url: string }> {
+  return apiClient.get<{ url: string }>(`/integrations/oauth/${platform.toLowerCase()}/authorize`);
+}
 
 export async function connectIntegration(type: string, config: any): Promise<any> {
   return apiClient.post(`/integrations/${type.toLowerCase()}/connect`, config);

@@ -10,7 +10,6 @@ import {
   ShieldCheck, 
   Slack, 
   Briefcase,
-  Layers
 } from "lucide-react";
 import { AwsConnectionForm } from "@/components/integrations/AwsConnectionForm";
 import { GithubConnectionForm } from "@/components/integrations/GithubConnectionForm";
@@ -18,13 +17,29 @@ import { OktaConnectionForm } from "@/components/integrations/OktaConnectionForm
 import { JiraConnectionForm } from "@/components/integrations/JiraConnectionForm";
 import { SlackConnectionForm } from "@/components/integrations/SlackConnectionForm";
 import { disconnectIntegrationByType } from "@/lib/api/endpoints";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 
 export default function IntegrationsPage() {
   const { integrationHealth, isLoading, fetchDashboardData } = useDashboardStore();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     fetchDashboardData();
-  }, [fetchDashboardData]);
+
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+    const platform = searchParams.get("platform");
+
+    if (success === "true") {
+      toast.success(`Successfully connected ${platform}!`);
+      // Clear URL params
+      window.history.replaceState({}, "", "/integrations");
+    } else if (error) {
+      toast.error(`Failed to connect ${platform || "service"}.`);
+      window.history.replaceState({}, "", "/integrations");
+    }
+  }, [fetchDashboardData, searchParams]);
 
   const providers = [
     {
