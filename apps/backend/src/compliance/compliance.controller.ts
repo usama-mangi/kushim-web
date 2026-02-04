@@ -21,4 +21,9 @@ export class ComplianceController {
   async getRecentAlerts(@Request() req: any) {
     return this.complianceService.getRecentAlerts(req.user.customerId);
   }
+
+  @Get('trends')
+  async getTrends(@Request() req: any) {
+    return this.complianceService.getTrends(req.user.customerId);
+  }
 }

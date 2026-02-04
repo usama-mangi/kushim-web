@@ -15,6 +15,7 @@ import {
   getSlackHealth,
   getControls,
   getRecentAlerts,
+  getComplianceTrends,
 } from "../lib/api/endpoints";
 
 interface DashboardState {
@@ -28,6 +29,7 @@ interface DashboardState {
     slack: IntegrationHealth | null;
   };
   complianceScore: ComplianceScore | null;
+  trends: any[];
   controls: Control[];
   alerts: Alert[];
 
@@ -60,6 +62,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     slack: null,
   },
   complianceScore: null,
+  trends: [],
   controls: [],
   alerts: [],
   isLoading: false,
@@ -77,10 +80,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       // Fetch overall health
       const healthResponse = await getOverallHealth();
       
-      // Fetch controls and alerts
-      const [controls, alerts] = await Promise.all([
+      // Fetch controls, alerts, and trends
+      const [controls, alerts, trends] = await Promise.all([
         getControls().catch(() => []),
         getRecentAlerts().catch(() => []),
+        getComplianceTrends().catch(() => []),
       ]);
 
       // Derive individual integration health from the overall metrics
@@ -122,6 +126,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         overallHealth: healthResponse.metrics,
         integrationHealth: { aws, github, okta, jira, slack },
         complianceScore,
+        trends: trends || [],
         controls: controls || [],
         alerts: alerts || [],
         lastRefresh: new Date(),

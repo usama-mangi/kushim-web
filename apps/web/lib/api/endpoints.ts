@@ -48,6 +48,10 @@ export async function getRecentAlerts(): Promise<any[]> {
   return apiClient.get<any[]>("/compliance/alerts");
 }
 
+export async function getComplianceTrends(): Promise<any[]> {
+  return apiClient.get<any[]>("/compliance/trends");
+}
+
 // ============================================================================
 // Reliability / Overall Health
 // ============================================================================

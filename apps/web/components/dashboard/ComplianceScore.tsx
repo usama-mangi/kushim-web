@@ -5,8 +5,10 @@ import { useDashboardStore } from "@/store/dashboard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Activity, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Activity, TrendingUp, TrendingDown, Minus, ArrowRight } from "lucide-react";
 import { formatPercentage } from "@/lib/utils";
+import Link from "next/link";
 
 export function ComplianceScore() {
   const { complianceScore, isLoading, fetchDashboardData } = useDashboardStore();
@@ -106,6 +108,20 @@ export function ComplianceScore() {
           <span className="text-sm text-muted-foreground">Total Controls</span>
           <Badge variant="secondary">{complianceScore.totalControls}</Badge>
         </div>
+
+        {/* Connect Integrations CTA */}
+        {complianceScore.passingControls === 0 && 
+         complianceScore.warningControls === 0 && 
+         complianceScore.failingControls === 0 && (
+          <div className="pt-4 border-t">
+            <Link href="/integrations" className="block w-full">
+              <Button className="w-full group" variant="outline">
+                Connect Integrations
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Button>
+            </Link>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

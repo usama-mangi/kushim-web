@@ -13,10 +13,11 @@ interface IntegrationCardProps {
   name: string;
   integration: IntegrationHealth | null;
   icon: React.ReactNode;
+  isLoading?: boolean;
 }
 
-function IntegrationCard({ name, integration, icon }: IntegrationCardProps) {
-  if (!integration) {
+function IntegrationCard({ name, integration, icon, isLoading }: IntegrationCardProps) {
+  if (isLoading && !integration) {
     return (
       <Card>
         <CardContent className="p-6">
@@ -26,6 +27,31 @@ function IntegrationCard({ name, integration, icon }: IntegrationCardProps) {
           </div>
           <Skeleton className="h-8 w-20 mb-2" />
           <Skeleton className="h-4 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!integration) {
+    return (
+      <Card className="bg-muted/30">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3 opacity-50 grayscale">
+              {icon}
+              <h3 className="font-semibold">{name}</h3>
+            </div>
+            <Badge variant="secondary">Disconnected</Badge>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <div className="text-3xl font-bold opacity-30">--%</div>
+              <div className="text-sm text-muted-foreground">Health Score</div>
+            </div>
+            <div className="text-xs text-muted-foreground pt-3 border-t">
+              Configuration required
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
@@ -149,6 +175,7 @@ export function IntegrationHealth() {
             name={int.name}
             integration={int.integration}
             icon={int.icon}
+            isLoading={isLoading}
           />
         ))}
       </div>

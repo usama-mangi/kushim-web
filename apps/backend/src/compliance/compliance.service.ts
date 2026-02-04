@@ -77,4 +77,45 @@ export class ComplianceService {
       acknowledged: false, // In a real app, this would be in the DB
     }));
   }
+
+  async getTrends(customerId: string) {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7);
+    startDate.setHours(0, 0, 0, 0);
+
+    const checks = await this.prisma.complianceCheck.findMany({
+      where: {
+        customerId,
+        checkedAt: { gte: startDate },
+      },
+      orderBy: { checkedAt: 'asc' },
+    });
+
+    // Group checks by day and only keep the latest check per control per day
+    const dailyData: Record<string, Record<string, CheckStatus>> = {};
+    
+    checks.forEach(check => {
+      const day = check.checkedAt.toISOString().split('T')[0];
+      if (!dailyData[day]) dailyData[day] = {};
+      dailyData[day][check.controlId] = check.status;
+    });
+
+    const days = Object.keys(dailyData).sort();
+    
+    // If no data, return some "empty" but structured data instead of nothing
+    if (days.length === 0) {
+      return [];
+    }
+
+    return days.map(day => {
+      const controlsInDay = Object.values(dailyData[day]);
+      const passing = controlsInDay.filter(s => s === CheckStatus.PASS).length;
+      const score = controlsInDay.length > 0 ? (passing / controlsInDay.length) * 100 : 0;
+      
+      return {
+        name: new Date(day).toLocaleDateString('en-US', { weekday: 'short' }),
+        score: Math.round(score),
+      };
+    });
+  }
 }
