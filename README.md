@@ -78,6 +78,44 @@ npm run build
 - 🚧 SOC 2 framework implementation
 - 🚧 Dashboard UI
 
+## Deployment
+
+Complete production deployment configurations are available for:
+
+- **Vercel + Render** (Recommended) - Managed services with auto-scaling
+- **Docker** - Self-hosted deployment on any VPS/cloud
+- **Kubernetes** - Enterprise-grade orchestration (coming soon)
+
+### Quick Deploy
+
+```bash
+# Option 1: Vercel + Render (Recommended)
+# See docs/DEPLOYMENT.md for full guide
+
+# Option 2: Docker
+cp .env.production.template .env.production
+docker-compose -f docker-compose.production.yml up -d
+```
+
+### Deployment Documentation
+
+- **[Main Deployment Guide](./docs/DEPLOYMENT.md)** - Complete step-by-step guide
+- **[Quick Checklist](./docs/DEPLOYMENT_CHECKLIST.md)** - Fast deployment checklist
+- **[Docker Deployment](./docs/DOCKER_DEPLOYMENT.md)** - Self-hosted guide
+- **[GitHub Actions Setup](./docs/GITHUB_ACTIONS_SETUP.md)** - CI/CD configuration
+- **[Deployment Overview](./docs/DEPLOYMENT_README.md)** - Options comparison
+
+### Health Checks
+
+Production deployments include comprehensive health check endpoints:
+
+```bash
+GET /health           # Basic service health
+GET /health/db        # Database connectivity
+GET /health/redis     # Redis connectivity
+GET /health/ready     # Readiness probe
+```
+
 ## License
 
 UNLICENSED - Private project

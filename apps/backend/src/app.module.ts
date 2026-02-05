@@ -25,6 +25,9 @@ import { AuditModule } from './audit/audit.module';
 import { EmailModule } from './email/email.module';
 import { UsersModule } from './users/users.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { LoggerModule } from './common/logger/logger.module';
+import { MetricsModule } from './common/metrics/metrics.module';
+import { MonitoringModule } from './common/monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -44,6 +47,9 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
         limit: 5, // 5 requests per minute for auth endpoints
       },
     ]),
+    LoggerModule,
+    MetricsModule,
+    MonitoringModule,
     CacheModule,
     PrismaModule,
     QueueModule,

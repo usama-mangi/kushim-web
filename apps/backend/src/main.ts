@@ -2,17 +2,28 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import compression from 'compression';
 import helmet from 'helmet';
-import * as cookieParser from 'cookie-parser';
-import * as session from 'express-session';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { getSecurityConfig } from './config/security.config';
 import { XssProtectionMiddleware } from './common/middleware/xss-protection.middleware';
+import { initializeSentry } from './common/monitoring/sentry.config';
+import { CustomLoggerService } from './common/logger/logger.service';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { PerformanceInterceptor } from './common/interceptors/performance.interceptor';
 
 async function bootstrap() {
+  // Initialize Sentry first
+  initializeSentry();
+
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug'],
   });
+
+  // Get custom logger and metrics from the app context
+  const customLogger = app.get(CustomLoggerService);
+  const metricsService = await app.resolve('MetricsService');
 
   const securityConfig = getSecurityConfig();
 
@@ -76,6 +87,12 @@ async function bootstrap() {
   // XSS Protection Middleware
   const xssProtection = new XssProtectionMiddleware();
   app.use((req, res, next) => xssProtection.use(req, res, next));
+
+  // Global exception filter
+  app.useGlobalFilters(new GlobalExceptionFilter(customLogger));
+
+  // Global performance interceptor
+  app.useGlobalInterceptors(new PerformanceInterceptor(customLogger, metricsService));
 
   // Global validation pipe with security settings
   app.useGlobalPipes(
@@ -154,6 +171,8 @@ async function bootstrap() {
   console.log(
     `📄 OpenAPI JSON schema at http://localhost:${port}/api/docs-json`,
   );
+  console.log(`📊 Metrics endpoint at http://localhost:${port}/api/metrics`);
+  console.log(`❤️  Health check at http://localhost:${port}/api/health`);
   console.log(`🔒 Security features enabled:`);
   console.log(`   - Helmet (CSP, HSTS, XSS, etc.)`);
   console.log(`   - CORS with whitelist`);
@@ -162,6 +181,12 @@ async function bootstrap() {
   console.log(`   - Rate Limiting`);
   console.log(`   - Secure Sessions`);
   console.log(`   - Audit Logging`);
+  console.log(`📈 Monitoring enabled:`);
+  console.log(`   - Sentry Error Tracking`);
+  console.log(`   - Prometheus Metrics`);
+  console.log(`   - Structured Logging (Winston)`);
+  console.log(`   - Performance Monitoring`);
+  console.log(`   - Alert System`);
 }
 
 bootstrap();

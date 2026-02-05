@@ -28,4 +28,68 @@ export class AppController {
   getHello() {
     return this.appService.getHello();
   }
+
+  @Get('health')
+  @ApiOperation({
+    summary: 'Basic health check',
+    description: 'Returns basic service health status',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Service is healthy',
+  })
+  async healthCheck() {
+    return this.appService.healthCheck();
+  }
+
+  @Get('health/db')
+  @ApiOperation({
+    summary: 'Database health check',
+    description: 'Checks database connectivity',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Database is healthy',
+  })
+  @ApiResponse({
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    description: 'Database is unavailable',
+  })
+  async healthCheckDb() {
+    return this.appService.healthCheckDb();
+  }
+
+  @Get('health/redis')
+  @ApiOperation({
+    summary: 'Redis health check',
+    description: 'Checks Redis connectivity',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Redis is healthy',
+  })
+  @ApiResponse({
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    description: 'Redis is unavailable',
+  })
+  async healthCheckRedis() {
+    return this.appService.healthCheckRedis();
+  }
+
+  @Get('health/ready')
+  @ApiOperation({
+    summary: 'Readiness probe',
+    description: 'Comprehensive readiness check for all dependencies',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Service is ready',
+  })
+  @ApiResponse({
+    status: HttpStatus.SERVICE_UNAVAILABLE,
+    description: 'Service is not ready',
+  })
+  async readinessCheck() {
+    return this.appService.readinessCheck();
+  }
 }

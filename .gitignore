@@ -50,3 +50,11 @@ apps/backend/prisma/migrations/
 # Misc
 *.tsbuildinfo
 .cache/
+
+# Deployment
+.vercel/
+backups/
+*.sql
+
+# Docker
+docker-compose.override.yml
