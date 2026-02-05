@@ -4,6 +4,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
 import * as session from 'express-session';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { getSecurityConfig } from './config/security.config';
 import { XssProtectionMiddleware } from './common/middleware/xss-protection.middleware';
@@ -93,10 +94,66 @@ async function bootstrap() {
   // Set global prefix
   app.setGlobalPrefix('api');
 
+  // Swagger/OpenAPI Configuration
+  const config = new DocumentBuilder()
+    .setTitle('Kushim API')
+    .setDescription(
+      'Compliance Automation Platform API - Automate SOC 2 compliance with integrated monitoring, evidence collection, and reporting.',
+    )
+    .setVersion('1.0')
+    .setContact('Kushim Support', 'https://kushim.io', 'support@kushim.io')
+    .setLicense('Proprietary', 'https://kushim.io/license')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth',
+    )
+    .addServer('http://localhost:3001', 'Local Development')
+    .addServer('https://staging-api.kushim.io', 'Staging')
+    .addServer('https://api.kushim.io', 'Production')
+    .addTag('auth', 'Authentication and authorization endpoints')
+    .addTag('users', 'User management and profile operations')
+    .addTag('compliance', 'Compliance controls, checks, and monitoring')
+    .addTag('evidence', 'Evidence collection and verification')
+    .addTag('integrations', 'Third-party integrations management')
+    .addTag('integrations/aws', 'AWS integration and evidence collection')
+    .addTag('integrations/github', 'GitHub integration and security checks')
+    .addTag('integrations/okta', 'Okta identity management integration')
+    .addTag('integrations/jira', 'Jira ticket management integration')
+    .addTag('integrations/slack', 'Slack notifications integration')
+    .addTag('integrations/oauth', 'OAuth callback handlers')
+    .addTag('health', 'Health check and system status')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document, {
+    customSiteTitle: 'Kushim API Documentation',
+    customfavIcon: 'https://kushim.io/favicon.ico',
+    customCss: '.swagger-ui .topbar { display: none }',
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'list',
+      filter: true,
+      showRequestDuration: true,
+    },
+  });
+
   const port = process.env.PORT || 3001;
   await app.listen(port);
 
   console.log(`🚀 Backend API running on http://localhost:${port}/api`);
+  console.log(
+    `📚 API Documentation available at http://localhost:${port}/api/docs`,
+  );
+  console.log(
+    `📄 OpenAPI JSON schema at http://localhost:${port}/api/docs-json`,
+  );
   console.log(`🔒 Security features enabled:`);
   console.log(`   - Helmet (CSP, HSTS, XSS, etc.)`);
   console.log(`   - CORS with whitelist`);

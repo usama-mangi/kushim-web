@@ -22,6 +22,8 @@ import { ComplianceModule } from './compliance/compliance.module';
 import { IntegrationsManagementModule } from './integrations/integrations.module';
 import { CacheModule } from './common/cache/cache.module';
 import { AuditModule } from './audit/audit.module';
+import { EmailModule } from './email/email.module';
+import { UsersModule } from './users/users.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 @Module({
@@ -54,6 +56,8 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     SlackModule,
     IntegrationReliabilityModule,
     AuthModule,
+    EmailModule,
+    UsersModule,
     EvidenceModule,
     ComplianceModule,
     IntegrationsManagementModule,
