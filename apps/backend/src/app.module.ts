@@ -29,6 +29,7 @@ import { LoggerModule } from './common/logger/logger.module';
 import { MetricsModule } from './common/metrics/metrics.module';
 import { MonitoringModule } from './common/monitoring/monitoring.module';
 import { AIModule } from './ai/ai.module';
+import { FrameworksModule } from './frameworks/frameworks.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { AIModule } from './ai/ai.module';
     IntegrationsManagementModule,
     AuditModule,
     AIModule,
+    FrameworksModule,
   ],
   controllers: [AppController],
   providers: [

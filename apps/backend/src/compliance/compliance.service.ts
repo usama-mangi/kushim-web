@@ -12,11 +12,12 @@ export class ComplianceService {
 
   async getAllControls(
     customerId: string,
+    frameworkId?: string,
     page: number = 1,
     limit: number = 50,
   ) {
     const skip = (page - 1) * limit;
-    const cacheKey = `controls:${customerId}:page:${page}:limit:${limit}`;
+    const cacheKey = `controls:${customerId}:framework:${frameworkId || 'all'}:page:${page}:limit:${limit}`;
 
     // Try cache first
     const cached = await this.cacheService.get(cacheKey);
@@ -24,11 +25,31 @@ export class ComplianceService {
       return cached;
     }
 
+    const where: any = {};
+    
+    // Filter by framework if provided
+    if (frameworkId) {
+      where.frameworkId = frameworkId;
+    } else {
+      // Get customer's active frameworks
+      const customerFrameworks = await this.prisma.customerFramework.findMany({
+        where: { customerId },
+        select: { frameworkId: true },
+      });
+      
+      if (customerFrameworks.length > 0) {
+        where.frameworkId = { in: customerFrameworks.map(cf => cf.frameworkId) };
+      }
+    }
+
     const [controls, total] = await Promise.all([
       this.prisma.control.findMany({
+        where,
         skip,
         take: limit,
         include: {
+          framework: true,
+          section: true,
           complianceChecks: {
             where: { customerId },
             orderBy: { checkedAt: 'desc' },
@@ -41,7 +62,7 @@ export class ComplianceService {
           },
         },
       }),
-      this.prisma.control.count(),
+      this.prisma.control.count({ where }),
     ]);
 
     const result = {
@@ -49,6 +70,10 @@ export class ComplianceService {
         const lastCheck = control.complianceChecks[0];
         return {
           id: control.id,
+          framework: control.framework.code,
+          frameworkName: control.framework.name,
+          section: control.section?.code,
+          sectionName: control.section?.title,
           name: control.title,
           description: control.description,
           category: control.category,

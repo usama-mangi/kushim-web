@@ -89,10 +89,11 @@ model Customer {
 
   users            User[]
   integrations     Integration[]
-  complianceChecks ComplianceCheck[]
-  evidence         Evidence[]
-  jiraTasks        JiraTask[]
-  policies         Policy[]
+  complianceChecks   ComplianceCheck[]
+  evidence           Evidence[]
+  jiraTasks          JiraTask[]
+  policies           Policy[]
+  customerFrameworks CustomerFramework[]
 
   @@index([email])
   @@index([status])
@@ -150,10 +151,49 @@ enum IntegrationStatus {
   SYNCING
 }
 
+model FrameworkModel {
+  id          String    @id @default(uuid())
+  code        String    @unique // SOC2, ISO27001, HIPAA, PCIDSS
+  name        String
+  description String    @db.Text
+  version     String
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  sections           FrameworkSection[]
+  controls           Control[]
+  customerFrameworks CustomerFramework[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("frameworks")
+}
+
+model FrameworkSection {
+  id          String   @id @default(uuid())
+  frameworkId String   @map("framework_id")
+  code        String   // A.5, CC6, Administrative
+  title       String
+  description String?  @db.Text
+  order       Int
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  framework FrameworkModel @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  controls  Control[]
+
+  @@unique([frameworkId, code])
+  @@index([frameworkId])
+  @@index([order])
+  @@map("framework_sections")
+}
+
 model Control {
   id              String           @id @default(uuid())
-  framework       Framework
-  controlId       String           @map("control_id") // e.g., CC6.1, A1.2
+  frameworkId     String           @map("framework_id")
+  sectionId       String?          @map("section_id")
+  controlId       String           @map("control_id") // e.g., CC6.1, A.5.1
   title           String
   description     String           @db.Text
   testProcedure   String           @map("test_procedure") @db.Text
@@ -163,25 +203,73 @@ model Control {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
+  framework              FrameworkModel         @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  section                FrameworkSection?      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   complianceChecks       ComplianceCheck[]
   evidence               Evidence[]
   evidenceMappings       EvidenceMapping[]
   policyTemplateControls PolicyTemplateControl[]
+  sourceMappings         FrameworkMapping[]     @relation("SourceControl")
+  targetMappings         FrameworkMapping[]     @relation("TargetControl")
 
-  @@unique([framework, controlId])
-  @@index([framework])
+  @@unique([frameworkId, controlId])
+  @@index([frameworkId])
+  @@index([sectionId])
   @@index([category])
   @@index([integrationType])
   @@map("controls")
 }
 
-enum Framework {
-  SOC2
-  ISO27001
-  HIPAA
-  GDPR
-  PCI_DSS
+model FrameworkMapping {
+  id              String        @id @default(uuid())
+  sourceControlId String        @map("source_control_id")
+  targetControlId String        @map("target_control_id")
+  mappingType     MappingType   @map("mapping_type")
+  notes           String?       @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  sourceControl Control @relation("SourceControl", fields: [sourceControlId], references: [id], onDelete: Cascade)
+  targetControl Control @relation("TargetControl", fields: [targetControlId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceControlId, targetControlId])
+  @@index([sourceControlId])
+  @@index([targetControlId])
+  @@index([mappingType])
+  @@map("framework_mappings")
 }
+
+enum MappingType {
+  EQUIVALENT
+  SIMILAR
+  PARTIAL
+}
+
+model CustomerFramework {
+  id          String                   @id @default(uuid())
+  customerId  String                   @map("customer_id")
+  frameworkId String                   @map("framework_id")
+  targetDate  DateTime?                @map("target_date")
+  status      CustomerFrameworkStatus  @default(IN_PROGRESS)
+  createdAt   DateTime                 @default(now()) @map("created_at")
+  updatedAt   DateTime                 @updatedAt @map("updated_at")
+
+  customer  Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  framework FrameworkModel @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, frameworkId])
+  @@index([customerId])
+  @@index([frameworkId])
+  @@index([status])
+  @@map("customer_frameworks")
+}
+
+enum CustomerFrameworkStatus {
+  IN_PROGRESS
+  COMPLIANT
+  NON_COMPLIANT
+}
+
+
 
 enum Frequency {
   DAILY
@@ -373,7 +461,7 @@ model PolicyTemplate {
   description     String   @db.Text
   templateContent String   @db.Text @map("template_content")
   variables       Json // Array of customizable fields
-  framework       Framework @default(SOC2)
+  frameworkId     String?  @map("framework_id")
   isActive        Boolean  @default(true) @map("is_active")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
@@ -382,7 +470,7 @@ model PolicyTemplate {
   policyTemplateControls PolicyTemplateControl[]
 
   @@index([category])
-  @@index([framework])
+  @@index([frameworkId])
   @@index([isActive])
   @@map("policy_templates")
 }

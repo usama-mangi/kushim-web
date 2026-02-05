@@ -82,11 +82,13 @@ export class ComplianceController {
   })
   async getAllControls(
     @Request() req: any,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query('frameworkId') frameworkId?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number = 1,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number = 50,
   ) {
     return this.complianceService.getAllControls(
       req.user.customerId,
+      frameworkId,
       page,
       Math.min(limit, 100),
     );

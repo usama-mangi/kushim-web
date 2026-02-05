@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Framework } from '@prisma/client';
 
 export class TemplateResponseDto {
   @ApiProperty()
@@ -20,8 +19,8 @@ export class TemplateResponseDto {
   @ApiProperty()
   variables: any;
 
-  @ApiProperty({ enum: Framework })
-  framework: Framework;
+  @ApiProperty({ required: false })
+  frameworkId?: string;
 
   @ApiProperty()
   isActive: boolean;
