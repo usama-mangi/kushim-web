@@ -4,15 +4,25 @@ import { Request, Response, NextFunction } from 'express';
 @Injectable()
 export class XssProtectionMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    if (req.body) {
+    // Sanitize body (can be modified directly)
+    if (req.body && typeof req.body === 'object') {
       req.body = this.sanitizeObject(req.body);
     }
-    if (req.query) {
-      req.query = this.sanitizeObject(req.query);
+    
+    // Sanitize query parameters (read-only, must modify in place)
+    if (req.query && typeof req.query === 'object') {
+      const sanitizedQuery = this.sanitizeObject(req.query);
+      Object.keys(req.query).forEach(key => delete (req.query as any)[key]);
+      Object.assign(req.query, sanitizedQuery);
     }
-    if (req.params) {
-      req.params = this.sanitizeObject(req.params);
+    
+    // Sanitize params (read-only, must modify in place)
+    if (req.params && typeof req.params === 'object') {
+      const sanitizedParams = this.sanitizeObject(req.params);
+      Object.keys(req.params).forEach(key => delete req.params[key]);
+      Object.assign(req.params, sanitizedParams);
     }
+    
     next();
   }
 

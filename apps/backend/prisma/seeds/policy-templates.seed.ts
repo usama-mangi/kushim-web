@@ -2,6 +2,14 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Framework enum for type safety
+enum Framework {
+  SOC2 = 'SOC2',
+  ISO27001 = 'ISO27001',
+  HIPAA = 'HIPAA',
+  PCIDSS = 'PCIDSS'
+}
+
 const policyTemplates = [
   {
     name: 'Information Security Policy',
