@@ -7,11 +7,20 @@ import { EvidenceMappingService } from './evidence-mapping/evidence-mapping.serv
 import { EvidenceMappingController } from './evidence-mapping/evidence-mapping.controller';
 import { PolicyDraftingModule } from './policy-drafting/policy-drafting.module';
 import { CopilotModule } from './copilot/copilot.module';
+import { AiOrchestratorService } from './integration/ai-orchestrator.service';
+import { AiOrchestratorController } from './integration/ai-orchestrator.controller';
+import { AiAnalyticsService } from './analytics/ai-analytics.service';
+import { AiAnalyticsController } from './analytics/ai-analytics.controller';
 import { PrismaService } from '../shared/prisma/prisma.service';
 import { CacheService } from '../common/cache/cache.service';
+import aiConfig from './config/ai.config';
 
 @Module({
-  imports: [ConfigModule, PolicyDraftingModule, CopilotModule],
+  imports: [
+    ConfigModule.forFeature(aiConfig),
+    PolicyDraftingModule,
+    CopilotModule,
+  ],
   providers: [
     PrismaService,
     CacheService,
@@ -19,13 +28,21 @@ import { CacheService } from '../common/cache/cache.service';
     PromptService,
     UsageTrackerService,
     EvidenceMappingService,
+    AiOrchestratorService,
+    AiAnalyticsService,
   ],
-  controllers: [EvidenceMappingController],
+  controllers: [
+    EvidenceMappingController,
+    AiOrchestratorController,
+    AiAnalyticsController,
+  ],
   exports: [
     OpenAIService,
     PromptService,
     UsageTrackerService,
     EvidenceMappingService,
+    AiOrchestratorService,
+    AiAnalyticsService,
     PolicyDraftingModule,
     CopilotModule,
   ],
