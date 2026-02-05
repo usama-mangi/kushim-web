@@ -92,6 +92,7 @@ model Customer {
   complianceChecks ComplianceCheck[]
   evidence         Evidence[]
   jiraTasks        JiraTask[]
+  policies         Policy[]
 
   @@index([email])
   @@index([status])
@@ -162,9 +163,10 @@ model Control {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  complianceChecks ComplianceCheck[]
-  evidence         Evidence[]
-  evidenceMappings EvidenceMapping[]
+  complianceChecks       ComplianceCheck[]
+  evidence               Evidence[]
+  evidenceMappings       EvidenceMapping[]
+  policyTemplateControls PolicyTemplateControl[]
 
   @@unique([framework, controlId])
   @@index([framework])
@@ -362,4 +364,94 @@ model AIUsageLog {
   @@index([customerId, operation])
   @@index([customerId, createdAt])
   @@map("ai_usage_logs")
+}
+
+model PolicyTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  category        String
+  description     String   @db.Text
+  templateContent String   @db.Text @map("template_content")
+  variables       Json // Array of customizable fields
+  framework       Framework @default(SOC2)
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  policies             Policy[]
+  policyTemplateControls PolicyTemplateControl[]
+
+  @@index([category])
+  @@index([framework])
+  @@index([isActive])
+  @@map("policy_templates")
+}
+
+model PolicyTemplateControl {
+  id               String   @id @default(uuid())
+  policyTemplateId String   @map("policy_template_id")
+  controlId        String   @map("control_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  policyTemplate PolicyTemplate @relation(fields: [policyTemplateId], references: [id], onDelete: Cascade)
+  control        Control        @relation(fields: [controlId], references: [id], onDelete: Cascade)
+
+  @@unique([policyTemplateId, controlId])
+  @@index([policyTemplateId])
+  @@index([controlId])
+  @@map("policy_template_controls")
+}
+
+model Policy {
+  id           String       @id @default(uuid())
+  customerId   String       @map("customer_id")
+  templateId   String       @map("template_id")
+  title        String
+  content      String       @db.Text
+  version      Int          @default(1)
+  status       PolicyStatus @default(DRAFT)
+  createdBy    String       @map("created_by")
+  reviewedBy   String?      @map("reviewed_by")
+  approvedBy   String?      @map("approved_by")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  reviewedAt   DateTime?    @map("reviewed_at")
+  approvedAt   DateTime?    @map("approved_at")
+
+  customer        Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  template        PolicyTemplate  @relation(fields: [templateId], references: [id])
+  policyVersions  PolicyVersion[]
+
+  @@index([customerId])
+  @@index([templateId])
+  @@index([status])
+  @@index([createdBy])
+  @@index([customerId, status])
+  @@index([customerId, templateId])
+  @@map("policies")
+}
+
+enum PolicyStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ARCHIVED
+}
+
+model PolicyVersion {
+  id        String   @id @default(uuid())
+  policyId  String   @map("policy_id")
+  version   Int
+  title     String
+  content   String   @db.Text
+  changes   String?  @db.Text
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, version])
+  @@index([policyId])
+  @@index([createdAt])
+  @@map("policy_versions")
 }
