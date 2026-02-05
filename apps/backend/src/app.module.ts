@@ -41,12 +41,12 @@ import { FrameworksModule } from './frameworks/frameworks.module';
       {
         name: 'default',
         ttl: 60000, // 60 seconds
-        limit: 100, // 100 requests per minute for general API
+        limit: 300, // 300 requests per minute for general API (allows dashboard bursts)
       },
       {
         name: 'auth',
         ttl: 60000, // 60 seconds
-        limit: 5, // 5 requests per minute for auth endpoints
+        limit: 10, // 10 requests per minute for auth endpoints
       },
     ]),
     LoggerModule,
@@ -76,10 +76,6 @@ import { FrameworksModule } from './frameworks/frameworks.module';
   controllers: [AppController],
   providers: [
     AppService,
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

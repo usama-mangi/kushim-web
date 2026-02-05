@@ -81,11 +81,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const healthResponse = await getOverallHealth();
       
       // Fetch controls, alerts, and trends
-      const [controls, alerts, trends] = await Promise.all([
+      const [controlsData, alertsData, trendsData] = await Promise.all([
         getControls().catch(() => []),
         getRecentAlerts().catch(() => []),
         getComplianceTrends().catch(() => []),
       ]);
+
+      // Ensure controls is an array
+      const controls = Array.isArray(controlsData) ? controlsData : [];
 
       // Derive individual integration health from the overall metrics
       const getHealthFor = (key: string): IntegrationHealth | null => {
@@ -126,9 +129,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         overallHealth: healthResponse.metrics,
         integrationHealth: { aws, github, okta, jira, slack },
         complianceScore,
-        trends: trends || [],
-        controls: controls || [],
-        alerts: alerts || [],
+        trends: Array.isArray(trendsData) ? trendsData : [],
+        controls: controls,
+        alerts: Array.isArray(alertsData) ? alertsData : [],
         lastRefresh: new Date(),
         isLoading: false,
         isRefreshing: false,

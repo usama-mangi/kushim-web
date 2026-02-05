@@ -10,7 +10,11 @@ import {
   FileText, 
   Settings, 
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  Sparkles,
+  Shield,
+  BookOpen,
+  FileSearch
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +26,12 @@ export function Navbar() {
 
   const navItems = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "AI Features", href: "/ai", icon: Sparkles },
+    { name: "Frameworks", href: "/frameworks", icon: Shield },
     { name: "Controls", href: "/controls", icon: ShieldCheck },
+    { name: "Policies", href: "/policies", icon: BookOpen },
     { name: "Reports", href: "/reports", icon: FileText },
+    { name: "Audit Logs", href: "/audit", icon: FileSearch },
     { name: "Integrations", href: "/integrations", icon: Settings },
   ];
 
@@ -56,6 +64,12 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-4">
+          <Link href="/settings">
+            <Button variant="ghost" size="icon" className="mr-2">
+              <Settings className="h-4 w-4" />
+            </Button>
+          </Link>
+          
           <div className="hidden sm:flex items-center gap-2 text-sm mr-4">
             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
               {user?.firstName?.charAt(0) || "U"}

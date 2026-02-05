@@ -69,7 +69,7 @@ export function EvidenceMappingPanel({ evidenceId, onMappingComplete }: Evidence
             <div>
               <div className="flex items-center justify-between">
                 <span className="font-medium">Control: {mapping.controlId}</span>
-                <Badge variant={mapping.confidence > 0.8 ? 'success' : 'warning'}>
+                <Badge variant={mapping.confidence > 0.8 ? 'default' : 'secondary'}>
                   {(mapping.confidence * 100).toFixed(0)}% Confidence
                 </Badge>
               </div>
@@ -90,7 +90,7 @@ export function EvidenceMappingPanel({ evidenceId, onMappingComplete }: Evidence
             )}
 
             {mapping.isManuallyReviewed && (
-              <Badge variant="success">Manually Reviewed</Badge>
+              <Badge variant="default">Manually Reviewed</Badge>
             )}
           </div>
         )}

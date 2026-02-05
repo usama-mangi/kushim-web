@@ -8,6 +8,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
   LoginDto,
@@ -37,6 +38,7 @@ import {
 
 @ApiTags('auth')
 @Controller('auth')
+@Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute for auth
 export class AuthController {
   constructor(private authService: AuthService) {}
 

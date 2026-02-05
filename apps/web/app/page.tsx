@@ -7,6 +7,7 @@ import { IntegrationHealth } from "@/components/dashboard/IntegrationHealth";
 import { ControlStatus } from "@/components/dashboard/ControlStatus";
 import { RecentAlerts } from "@/components/dashboard/RecentAlerts";
 import { ComplianceTrends } from "@/components/dashboard/ComplianceTrends";
+import { AIInsightsBanner } from "@/components/ai/AIInsightsBanner";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RefreshCw, AlertCircle } from "lucide-react";
@@ -84,6 +85,9 @@ export default function Home() {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* AI Insights Banner */}
+        <AIInsightsBanner />
 
         <div className="space-y-8">
           {/* Compliance Score Section */}

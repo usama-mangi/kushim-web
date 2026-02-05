@@ -180,3 +180,111 @@ export async function getOAuthAuthorizeUrl(platform: string): Promise<{ url: str
 export async function connectIntegration(type: string, config: any): Promise<any> {
   return apiClient.post(`/integrations/${type.toLowerCase()}/connect`, config);
 }
+
+// ============================================================================
+// AI Features
+// ============================================================================
+
+export async function getAIInsights(): Promise<any[]> {
+  return apiClient.get<any[]>("/ai/insights");
+}
+
+export async function chatWithCopilot(data: { message: string; conversationId?: string }): Promise<any> {
+  return apiClient.post("/ai/copilot/chat", data);
+}
+
+export async function mapEvidence(evidenceId: string): Promise<any> {
+  return apiClient.post("/ai/evidence-mapping", { evidenceId });
+}
+
+export async function approveEvidenceMapping(mappingId: string): Promise<any> {
+  return apiClient.post(`/ai/evidence-mapping/${mappingId}/approve`);
+}
+
+export async function generatePolicy(data: { policyType: string; controlIds: string[] }): Promise<any> {
+  return apiClient.post("/ai/policy-drafting", data);
+}
+
+export async function reviewPolicy(policyId: string): Promise<any> {
+  return apiClient.post(`/ai/policy-drafting/${policyId}/review`);
+}
+
+export async function getAIUsageStats(): Promise<any> {
+  return apiClient.get("/ai/usage");
+}
+
+// ============================================================================
+// Frameworks
+// ============================================================================
+
+export async function getFrameworks(): Promise<any[]> {
+  return apiClient.get<any[]>("/frameworks");
+}
+
+export async function getFrameworkControls(framework: string): Promise<any[]> {
+  return apiClient.get<any[]>(`/frameworks/${framework}/controls`);
+}
+
+export async function activateFramework(frameworkId: string): Promise<any> {
+  return apiClient.post(`/frameworks/${frameworkId}/activate`);
+}
+
+// ============================================================================
+// Policies
+// ============================================================================
+
+export async function getPolicies(): Promise<any[]> {
+  return apiClient.get<any[]>("/policies");
+}
+
+export async function downloadPolicy(policyId: string, format: "pdf" | "docx" | "md"): Promise<Blob> {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/policies/${policyId}/download?format=${format}`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+  return response.blob();
+}
+
+// ============================================================================
+// Audit Logs
+// ============================================================================
+
+export async function getAuditLogs(params?: { action?: string; dateRange?: string }): Promise<any[]> {
+  const query = new URLSearchParams(params as any);
+  return apiClient.get<any[]>(`/audit?${query}`);
+}
+
+export async function exportAuditLogs(params?: { action?: string; dateRange?: string }): Promise<Blob> {
+  const query = new URLSearchParams(params as any);
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/audit/export?${query}`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+  return response.blob();
+}
+
+// ============================================================================
+// User Settings
+// ============================================================================
+
+export async function updateUserProfile(data: { firstName: string; lastName: string; email: string }): Promise<any> {
+  return apiClient.put("/users/profile", data);
+}
+
+export async function updateUserPreferences(data: any): Promise<any> {
+  return apiClient.put("/users/preferences", data);
+}
+
+export async function getUserApiKeys(): Promise<any[]> {
+  return apiClient.get<any[]>("/users/api-keys");
+}
+
+export async function createApiKey(name: string): Promise<any> {
+  return apiClient.post("/users/api-keys", { name });
+}
+
+export async function deleteApiKey(keyId: string): Promise<any> {
+  return apiClient.delete(`/users/api-keys/${keyId}`);
+}

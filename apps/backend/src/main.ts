@@ -12,6 +12,7 @@ import { initializeSentry } from './common/monitoring/sentry.config';
 import { CustomLoggerService } from './common/logger/logger.service';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { PerformanceInterceptor } from './common/interceptors/performance.interceptor';
+import { MetricsService } from './common/metrics/metrics.service';
 
 async function bootstrap() {
   // Initialize Sentry first
@@ -23,7 +24,7 @@ async function bootstrap() {
 
   // Get custom logger and metrics from the app context
   const customLogger = app.get(CustomLoggerService);
-  const metricsService = await app.resolve('MetricsService');
+  const metricsService = app.get(MetricsService);
 
   const securityConfig = getSecurityConfig();
 

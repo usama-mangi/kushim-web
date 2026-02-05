@@ -8,10 +8,12 @@ import {
   Request,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { SkipThrottle } from '@nestjs/throttler';
 import { IntegrationReliabilityService } from './integration-reliability.service';
 
 @Controller('reliability')
 @UseGuards(AuthGuard('jwt'))
+@SkipThrottle()
 export class IntegrationReliabilityController {
   constructor(
     private readonly reliabilityService: IntegrationReliabilityService,
