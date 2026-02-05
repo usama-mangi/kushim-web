@@ -30,6 +30,26 @@ export class FrameworkResponseDto {
   controlCount?: number;
 }
 
+export class FrameworkSectionResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  frameworkId: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiPropertyOptional()
+  description?: string;
+
+  @ApiProperty()
+  order: number;
+}
+
 export class ControlResponseDto {
   @ApiProperty()
   id: string;
@@ -63,26 +83,6 @@ export class ControlResponseDto {
 
   @ApiPropertyOptional()
   section?: FrameworkSectionResponseDto;
-}
-
-export class FrameworkSectionResponseDto {
-  @ApiProperty()
-  id: string;
-
-  @ApiProperty()
-  frameworkId: string;
-
-  @ApiProperty()
-  code: string;
-
-  @ApiProperty()
-  title: string;
-
-  @ApiPropertyOptional()
-  description?: string;
-
-  @ApiProperty()
-  order: number;
 }
 
 export class ControlMappingResponseDto {

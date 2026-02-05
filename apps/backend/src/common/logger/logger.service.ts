@@ -1,4 +1,4 @@
-import { Injectable, LoggerService as NestLoggerService } from '@nestjs/common';
+import { Injectable, LoggerService as NestLoggerService, Optional } from '@nestjs/common';
 import * as winston from 'winston';
 import 'winston-daily-rotate-file';
 
@@ -27,7 +27,7 @@ export class CustomLoggerService implements NestLoggerService {
   private logger: winston.Logger;
   private context?: string;
 
-  constructor(context?: string) {
+  constructor(@Optional() context?: string) {
     this.context = context;
     this.logger = winston.createLogger({
       level: process.env.LOG_LEVEL || 'info',
