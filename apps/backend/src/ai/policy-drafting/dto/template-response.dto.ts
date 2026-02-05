@@ -19,8 +19,8 @@ export class TemplateResponseDto {
   @ApiProperty()
   variables: any;
 
-  @ApiProperty({ required: false })
-  frameworkId?: string;
+  @ApiProperty({ required: false, nullable: true })
+  frameworkId?: string | null;
 
   @ApiProperty()
   isActive: boolean;

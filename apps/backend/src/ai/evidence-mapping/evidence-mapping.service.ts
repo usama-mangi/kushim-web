@@ -56,7 +56,7 @@ export class EvidenceMappingService {
     const controls = await this.getRelevantControls(evidence);
 
     if (controls.length === 0) {
-      this.logger.warn(`No controls found for framework: ${evidence.control.framework}`);
+      this.logger.warn(`No controls found for framework: ${evidence.control.frameworkId}`);
       return [];
     }
 
@@ -375,7 +375,7 @@ Only include mappings with confidence >= 0.5. Maximum 10 mappings.`;
   ): Promise<Control[]> {
     return this.prisma.control.findMany({
       where: {
-        framework: evidence.control.framework,
+        frameworkId: evidence.control.frameworkId,
       },
     });
   }

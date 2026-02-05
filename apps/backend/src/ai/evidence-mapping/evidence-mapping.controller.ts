@@ -128,7 +128,7 @@ export class EvidenceMappingController {
         controlId: m.control.controlId,
         title: m.control.title,
         description: m.control.description,
-        framework: m.control.framework,
+        frameworkId: m.control.frameworkId,
       },
       confidence: Number(m.confidence),
       aiReasoning: m.aiReasoning,

@@ -320,16 +320,17 @@ export class AiAnalyticsService {
       return acc;
     }, {} as Record<string, { requests: number; cost: number; tokens: number }>);
 
-    return Object.entries(grouped).reduce((acc, [operation, stats]) => {
-      acc[operation] = {
+    const result: Record<string, FeatureStats> = {};
+    for (const [operation, stats] of Object.entries(grouped) as Array<[string, { requests: number; cost: number; tokens: number }]>) {
+      result[operation] = {
         requests: stats.requests,
         cost: stats.cost,
         tokens: stats.tokens,
         avgCostPerRequest: stats.cost / stats.requests,
         avgTokensPerRequest: stats.tokens / stats.requests,
       };
-      return acc;
-    }, {} as Record<string, FeatureStats>);
+    }
+    return result;
   }
 
   private groupByModel(records: any[]): Record<string, ModelStats> {
@@ -344,14 +345,15 @@ export class AiAnalyticsService {
       return acc;
     }, {} as Record<string, { requests: number; cost: number; tokens: number }>);
 
-    return Object.entries(grouped).reduce((acc, [model, stats]) => {
-      acc[model] = {
+    const result: Record<string, ModelStats> = {};
+    for (const [model, stats] of Object.entries(grouped) as Array<[string, { requests: number; cost: number; tokens: number }]>) {
+      result[model] = {
         requests: stats.requests,
         cost: stats.cost,
         tokens: stats.tokens,
       };
-      return acc;
-    }, {} as Record<string, ModelStats>);
+    }
+    return result;
   }
 
   private groupByDay(records: any[]): DayStats[] {
@@ -366,13 +368,15 @@ export class AiAnalyticsService {
       return acc;
     }, {} as Record<string, { requests: number; cost: number; tokens: number }>);
 
-    return Object.entries(grouped)
-      .map(([date, stats]) => ({ 
-        date, 
-        requests: stats.requests, 
-        cost: stats.cost, 
-        tokens: stats.tokens 
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const result: DayStats[] = [];
+    for (const [date, stats] of Object.entries(grouped) as Array<[string, { requests: number; cost: number; tokens: number }]>) {
+      result.push({
+        date,
+        requests: stats.requests,
+        cost: stats.cost,
+        tokens: stats.tokens,
+      });
+    }
+    return result.sort((a, b) => a.date.localeCompare(b.date));
   }
 }
