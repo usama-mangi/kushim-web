@@ -1133,12 +1133,18 @@ export async function seedPolicyTemplates() {
     console.log(`✓ Created/Updated template: ${created.name}`);
 
     if (controls && controls.length > 0) {
-      const controlRecords = await prisma.control.findMany({
-        where: {
-          controlId: { in: controls },
-          framework: Framework.SOC2,
-        },
+      // Get the SOC2 framework
+      const soc2Framework = await prisma.frameworkModel.findUnique({
+        where: { code: Framework.SOC2 },
       });
+
+      if (soc2Framework) {
+        const controlRecords = await prisma.control.findMany({
+          where: {
+            controlId: { in: controls },
+            frameworkId: soc2Framework.id,
+          },
+        });
 
       for (const control of controlRecords) {
         await prisma.policyTemplateControl.upsert({
@@ -1157,6 +1163,7 @@ export async function seedPolicyTemplates() {
       }
 
       console.log(`  → Linked ${controlRecords.length} controls`);
+      }
     }
   }
 

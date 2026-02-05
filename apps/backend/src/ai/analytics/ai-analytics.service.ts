@@ -88,7 +88,7 @@ export class AiAnalyticsService {
     });
 
     const totalRequests = usageRecords.length;
-    const estimatedCostUsd = usageRecords.reduce((sum, r) => sum + r.estimatedCostUsd, 0);
+    const estimatedCostUsd = usageRecords.reduce((sum, r) => sum + Number(r.estimatedCostUsd), 0);
     const totalTokens = usageRecords.reduce((sum, r) => sum + r.promptTokens + r.completionTokens, 0);
 
     // Group by operation
@@ -152,7 +152,7 @@ export class AiAnalyticsService {
     });
 
     const byFeature = byFeatureRecords.reduce((acc, r) => {
-      acc[r.operation] = r._sum.estimatedCostUsd || 0;
+      acc[r.operation] = Number(r._sum.estimatedCostUsd || 0);
       return acc;
     }, {} as Record<string, number>);
 
@@ -169,7 +169,7 @@ export class AiAnalyticsService {
     });
 
     const byModel = byModelRecords.reduce((acc, r) => {
-      acc[r.model] = r._sum.estimatedCostUsd || 0;
+      acc[r.model] = Number(r._sum.estimatedCostUsd || 0);
       return acc;
     }, {} as Record<string, number>);
 
@@ -180,17 +180,17 @@ export class AiAnalyticsService {
       0
     ).getDate();
     const dayOfMonth = new Date().getDate();
-    const projectedMonthly = (currentCost / dayOfMonth) * daysInMonth;
+    const projectedMonthly = (Number(currentCost) / dayOfMonth) * daysInMonth;
 
     const vsLastMonth = {
-      absolute: currentCost - previousCost,
-      percentage: previousCost > 0
-        ? ((currentCost - previousCost) / previousCost) * 100
+      absolute: Number(currentCost) - Number(previousCost),
+      percentage: Number(previousCost) > 0
+        ? ((Number(currentCost) - Number(previousCost)) / Number(previousCost)) * 100
         : 0,
     };
 
     return {
-      total: currentCost,
+      total: Number(currentCost),
       byFeature,
       byModel,
       projectedMonthly,
@@ -293,7 +293,7 @@ export class AiAnalyticsService {
     });
 
     const costPerHour = timeSavedHours > 0
-      ? (estimatedCostUsd._sum.estimatedCostUsd || 0) / timeSavedHours
+      ? Number(estimatedCostUsd._sum.estimatedCostUsd || 0) / timeSavedHours
       : 0;
 
     return {
@@ -315,14 +315,16 @@ export class AiAnalyticsService {
         acc[operation] = { requests: 0, cost: 0, tokens: 0 };
       }
       acc[operation].requests += 1;
-      acc[operation].cost += record.estimatedCostUsd;
+      acc[operation].cost += Number(record.estimatedCostUsd);
       acc[operation].tokens += record.promptTokens + record.completionTokens;
       return acc;
     }, {} as Record<string, { requests: number; cost: number; tokens: number }>);
 
     return Object.entries(grouped).reduce((acc, [operation, stats]) => {
       acc[operation] = {
-        ...stats,
+        requests: stats.requests,
+        cost: stats.cost,
+        tokens: stats.tokens,
         avgCostPerRequest: stats.cost / stats.requests,
         avgTokensPerRequest: stats.tokens / stats.requests,
       };
@@ -331,14 +333,23 @@ export class AiAnalyticsService {
   }
 
   private groupByModel(records: any[]): Record<string, ModelStats> {
-    return records.reduce((acc, record) => {
+    const grouped = records.reduce((acc, record) => {
       const model = record.model;
       if (!acc[model]) {
         acc[model] = { requests: 0, cost: 0, tokens: 0 };
       }
       acc[model].requests += 1;
-      acc[model].cost += record.estimatedCostUsd;
+      acc[model].cost += Number(record.estimatedCostUsd);
       acc[model].tokens += record.promptTokens + record.completionTokens;
+      return acc;
+    }, {} as Record<string, { requests: number; cost: number; tokens: number }>);
+
+    return Object.entries(grouped).reduce((acc, [model, stats]) => {
+      acc[model] = {
+        requests: stats.requests,
+        cost: stats.cost,
+        tokens: stats.tokens,
+      };
       return acc;
     }, {} as Record<string, ModelStats>);
   }
@@ -350,13 +361,18 @@ export class AiAnalyticsService {
         acc[date] = { requests: 0, cost: 0, tokens: 0 };
       }
       acc[date].requests += 1;
-      acc[date].cost += record.estimatedCostUsd;
+      acc[date].cost += Number(record.estimatedCostUsd);
       acc[date].tokens += record.promptTokens + record.completionTokens;
       return acc;
     }, {} as Record<string, { requests: number; cost: number; tokens: number }>);
 
     return Object.entries(grouped)
-      .map(([date, stats]) => ({ date, ...stats }))
+      .map(([date, stats]) => ({ 
+        date, 
+        requests: stats.requests, 
+        cost: stats.cost, 
+        tokens: stats.tokens 
+      }))
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 }
