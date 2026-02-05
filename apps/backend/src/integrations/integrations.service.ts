@@ -42,12 +42,15 @@ export class IntegrationsService {
   async deleteIntegrationByType(customerId: string, type: string) {
     const normalizedType = type.toUpperCase() as IntegrationType;
     const integrations = await this.prisma.integration.findMany({
-        where: { customerId: customerId, type: normalizedType }
+      where: { customerId: customerId, type: normalizedType },
     });
 
     if (integrations.length === 0) {
-        // If not found in DB, we consider it already disconnected
-        return { count: 0, message: `No database record for ${normalizedType} found, already disconnected.` };
+      // If not found in DB, we consider it already disconnected
+      return {
+        count: 0,
+        message: `No database record for ${normalizedType} found, already disconnected.`,
+      };
     }
 
     return this.prisma.integration.deleteMany({
@@ -58,11 +61,11 @@ export class IntegrationsService {
   async connect(customerId: string, type: IntegrationType, config: any) {
     // Encrypt sensitive fields
     const sensitiveKeys = [
-      'personalAccessToken', 
-      'token', 
-      'secretAccessKey', 
-      'apiToken', 
-      'webhookUrl', 
+      'personalAccessToken',
+      'token',
+      'secretAccessKey',
+      'apiToken',
+      'webhookUrl',
       'secret',
     ];
 
@@ -73,22 +76,26 @@ export class IntegrationsService {
       }
     }
 
-    console.log(`[IntegrationsService] Connecting ${type} for customer ${customerId}`);
+    console.log(
+      `[IntegrationsService] Connecting ${type} for customer ${customerId}`,
+    );
     // Find existing or create new
     const existing = await this.prisma.integration.findFirst({
-        where: { customerId, type }
+      where: { customerId, type },
     });
 
     if (existing) {
-        console.log(`[IntegrationsService] Updating existing ${type} integration ${existing.id}`);
-        return this.prisma.integration.update({
-            where: { id: existing.id },
-            data: {
-                config: encryptedConfig,
-                status: 'ACTIVE',
-                lastSyncAt: new Date(),
-            }
-        });
+      console.log(
+        `[IntegrationsService] Updating existing ${type} integration ${existing.id}`,
+      );
+      return this.prisma.integration.update({
+        where: { id: existing.id },
+        data: {
+          config: encryptedConfig,
+          status: 'ACTIVE',
+          lastSyncAt: new Date(),
+        },
+      });
     }
 
     console.log(`[IntegrationsService] Creating new ${type} integration`);
@@ -108,9 +115,12 @@ export class IntegrationsService {
       throw err;
     }
   }
-  async getDecryptedConfig(customerId: string, type: IntegrationType): Promise<any> {
+  async getDecryptedConfig(
+    customerId: string,
+    type: IntegrationType,
+  ): Promise<any> {
     const integration = await this.prisma.integration.findFirst({
-        where: { customerId, type }
+      where: { customerId, type },
     });
 
     if (!integration) return null;
@@ -130,7 +140,11 @@ export class IntegrationsService {
     ];
 
     for (const key of sensitiveKeys) {
-      if (decrypted[key] && typeof decrypted[key] === 'string' && decrypted[key].includes(':')) {
+      if (
+        decrypted[key] &&
+        typeof decrypted[key] === 'string' &&
+        decrypted[key].includes(':')
+      ) {
         try {
           decrypted[key] = decrypt(decrypted[key]);
         } catch (error) {

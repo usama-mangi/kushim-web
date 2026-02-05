@@ -12,7 +12,10 @@ export class EvidenceController {
     @Param('controlId') controlId: string,
     @Request() req: any,
   ) {
-    return this.evidenceService.getEvidenceByControl(req.user.customerId, controlId);
+    return this.evidenceService.getEvidenceByControl(
+      req.user.customerId,
+      controlId,
+    );
   }
 
   @Get(':id')
@@ -25,4 +28,3 @@ export class EvidenceController {
     return this.evidenceService.verifyEvidence(req.user.customerId, id);
   }
 }
-

@@ -45,12 +45,7 @@ import { SlackModule } from '../../integrations/slack/slack.module';
     JiraModule,
     SlackModule,
   ],
-  providers: [
-    EvidenceCollectionProcessor,
-    ComplianceCheckProcessor,
-  ],
-  exports: [
-    BullModule,
-  ],
+  providers: [EvidenceCollectionProcessor, ComplianceCheckProcessor],
+  exports: [BullModule],
 })
 export class QueueModule {}

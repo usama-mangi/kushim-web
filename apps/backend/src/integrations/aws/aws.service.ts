@@ -15,7 +15,10 @@ import {
   CloudTrailClient,
   LookupEventsCommand,
 } from '@aws-sdk/client-cloudtrail';
-import { retryWithBackoff, CircuitBreaker } from '../../common/utils/retry.util';
+import {
+  retryWithBackoff,
+  CircuitBreaker,
+} from '../../common/utils/retry.util';
 
 @Injectable()
 export class AwsService {
@@ -34,7 +37,10 @@ export class AwsService {
 
     this.defaultIamClient = new IAMClient({ region, credentials });
     this.defaultS3Client = new S3Client({ region, credentials });
-    this.defaultCloudTrailClient = new CloudTrailClient({ region, credentials });
+    this.defaultCloudTrailClient = new CloudTrailClient({
+      region,
+      credentials,
+    });
   }
 
   private getIamClient(credentials?: any): IAMClient {
@@ -75,7 +81,8 @@ export class AwsService {
     return {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
-      region: config.region || this.configService.get('AWS_REGION', 'us-east-1'),
+      region:
+        config.region || this.configService.get('AWS_REGION', 'us-east-1'),
     };
   }
 
@@ -91,7 +98,7 @@ export class AwsService {
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         const users = await client.send(new ListUsersCommand({}));
-        
+
         const userMfaStatus = await Promise.all(
           (users.Users || []).map(async (user) => {
             const mfaDevices = await client.send(
@@ -110,9 +117,12 @@ export class AwsService {
 
         const totalUsers = userMfaStatus.length;
         const usersWithMfa = userMfaStatus.filter((u) => u.hasMfa).length;
-        const mfaComplianceRate = totalUsers > 0 ? usersWithMfa / totalUsers : 0;
+        const mfaComplianceRate =
+          totalUsers > 0 ? usersWithMfa / totalUsers : 0;
 
-        this.logger.log(`IAM evidence collected: ${usersWithMfa}/${totalUsers} users have MFA`);
+        this.logger.log(
+          `IAM evidence collected: ${usersWithMfa}/${totalUsers} users have MFA`,
+        );
 
         return {
           type: 'IAM_MFA_ENFORCEMENT',
@@ -146,7 +156,7 @@ export class AwsService {
         const bucketEncryptionStatus = await Promise.all(
           (buckets.Buckets || []).map(async (bucket) => {
             try {
-               // Use the scoped client for each bucket check
+              // Use the scoped client for each bucket check
               const encryption = await client.send(
                 new GetBucketEncryptionCommand({ Bucket: bucket.Name }),
               );
@@ -155,8 +165,9 @@ export class AwsService {
                 bucketName: bucket.Name,
                 createdAt: bucket.CreationDate,
                 encrypted: true,
-                encryptionType: encryption.ServerSideEncryptionConfiguration
-                  ?.Rules?.[0]?.ApplyServerSideEncryptionByDefault?.SSEAlgorithm,
+                encryptionType:
+                  encryption.ServerSideEncryptionConfiguration?.Rules?.[0]
+                    ?.ApplyServerSideEncryptionByDefault?.SSEAlgorithm,
               };
             } catch (error) {
               // NoSuchBucketEncryption error means bucket is not encrypted
@@ -171,10 +182,15 @@ export class AwsService {
         );
 
         const totalBuckets = bucketEncryptionStatus.length;
-        const encryptedBuckets = bucketEncryptionStatus.filter((b) => b.encrypted).length;
-        const encryptionComplianceRate = totalBuckets > 0 ? encryptedBuckets / totalBuckets : 1;
+        const encryptedBuckets = bucketEncryptionStatus.filter(
+          (b) => b.encrypted,
+        ).length;
+        const encryptionComplianceRate =
+          totalBuckets > 0 ? encryptedBuckets / totalBuckets : 1;
 
-        this.logger.log(`S3 evidence collected: ${encryptedBuckets}/${totalBuckets} buckets encrypted`);
+        this.logger.log(
+          `S3 evidence collected: ${encryptedBuckets}/${totalBuckets} buckets encrypted`,
+        );
 
         return {
           type: 'S3_ENCRYPTION',
@@ -196,7 +212,11 @@ export class AwsService {
    * Upload evidence file to S3 storage
    * Used for large evidence payloads or files that shouldn't be stored in DB
    */
-  async uploadEvidenceToS3(key: string, data: string | Buffer, contentType: string = 'application/json') {
+  async uploadEvidenceToS3(
+    key: string,
+    data: string | Buffer,
+    contentType: string = 'application/json',
+  ) {
     this.logger.log(`Uploading evidence to S3: ${key}`);
     const bucketName = this.configService.get('AWS_S3_BUCKET_NAME');
 
@@ -213,16 +233,19 @@ export class AwsService {
           Body: data,
           ContentType: contentType,
           ServerSideEncryption: 'AES256',
-        })
+        }),
       );
-      
+
       return {
         bucket: bucketName,
         key: key,
-        url: `https://${bucketName}.s3.amazonaws.com/${key}`
+        url: `https://${bucketName}.s3.amazonaws.com/${key}`,
       };
     } catch (error) {
-      this.logger.error(`Failed to upload evidence to S3: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to upload evidence to S3: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -252,7 +275,9 @@ export class AwsService {
         const eventCount = (events.Events || []).length;
         const hasRecentActivity = eventCount > 0;
 
-        this.logger.log(`CloudTrail evidence collected: ${eventCount} events in last 24h`);
+        this.logger.log(
+          `CloudTrail evidence collected: ${eventCount} events in last 24h`,
+        );
 
         return {
           type: 'CLOUDTRAIL_LOGGING',
@@ -294,9 +319,12 @@ export class AwsService {
         cloudTrailEvidence.status === 'PASS' ? 1 : 0.5,
       ];
 
-      const healthScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      const healthScore =
+        scores.reduce((sum, score) => sum + score, 0) / scores.length;
 
-      this.logger.log(`AWS health score calculated: ${(healthScore * 100).toFixed(2)}%`);
+      this.logger.log(
+        `AWS health score calculated: ${(healthScore * 100).toFixed(2)}%`,
+      );
 
       return healthScore;
     } catch (error) {

@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { type Queue } from 'bull';
-import { QueueName, EvidenceCollectionJobType } from './shared/queue/queue.constants';
+import {
+  QueueName,
+  EvidenceCollectionJobType,
+} from './shared/queue/queue.constants';
 
 @Injectable()
 export class AppService {
@@ -33,7 +36,9 @@ export class AppService {
       type,
     });
 
-    this.logger.log(`Queued evidence collection job ${job.id} for customer ${customerId}`);
+    this.logger.log(
+      `Queued evidence collection job ${job.id} for customer ${customerId}`,
+    );
     return { jobId: job.id };
   }
 }

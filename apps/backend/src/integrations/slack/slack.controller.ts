@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { SlackService } from './slack.service';
 import { IntegrationsService } from '../integrations.service';
@@ -14,13 +23,21 @@ export class SlackController {
 
   @Get('health')
   async getHealth(@Request() req: any) {
-    const config = await this.integrationsService.getDecryptedConfig(req.user.customerId, IntegrationType.SLACK);
-    const isConnected = await this.slackService.checkConnection(config?.webhookUrl);
+    const config = await this.integrationsService.getDecryptedConfig(
+      req.user.customerId,
+      IntegrationType.SLACK,
+    );
+    const isConnected = await this.slackService.checkConnection(
+      config?.webhookUrl,
+    );
     const circuitBreakerStatus = this.slackService.getCircuitBreakerStatus();
 
     return {
       integration: 'slack',
-      status: isConnected && circuitBreakerStatus.state !== 'OPEN' ? 'healthy' : 'unhealthy',
+      status:
+        isConnected && circuitBreakerStatus.state !== 'OPEN'
+          ? 'healthy'
+          : 'unhealthy',
       circuitBreaker: circuitBreakerStatus,
       timestamp: new Date(),
     };
@@ -39,8 +56,14 @@ export class SlackController {
       evidenceId?: string;
     },
   ) {
-    const config = await this.integrationsService.getDecryptedConfig(req.user.customerId, IntegrationType.SLACK);
-    return await this.slackService.sendAlert({ ...body, webhookUrl: config?.webhookUrl });
+    const config = await this.integrationsService.getDecryptedConfig(
+      req.user.customerId,
+      IntegrationType.SLACK,
+    );
+    return await this.slackService.sendAlert({
+      ...body,
+      webhookUrl: config?.webhookUrl,
+    });
   }
 
   @Post('summary/daily')
@@ -56,8 +79,14 @@ export class SlackController {
       complianceRate: number;
     },
   ) {
-    const config = await this.integrationsService.getDecryptedConfig(req.user.customerId, IntegrationType.SLACK);
-    return await this.slackService.sendDailySummary({ ...body, webhookUrl: config?.webhookUrl });
+    const config = await this.integrationsService.getDecryptedConfig(
+      req.user.customerId,
+      IntegrationType.SLACK,
+    );
+    return await this.slackService.sendDailySummary({
+      ...body,
+      webhookUrl: config?.webhookUrl,
+    });
   }
 
   @Post('warning/integration-health')
@@ -71,7 +100,13 @@ export class SlackController {
       issues: string[];
     },
   ) {
-    const config = await this.integrationsService.getDecryptedConfig(req.user.customerId, IntegrationType.SLACK);
-    return await this.slackService.sendIntegrationHealthWarning({ ...body, webhookUrl: config?.webhookUrl });
+    const config = await this.integrationsService.getDecryptedConfig(
+      req.user.customerId,
+      IntegrationType.SLACK,
+    );
+    return await this.slackService.sendIntegrationHealthWarning({
+      ...body,
+      webhookUrl: config?.webhookUrl,
+    });
   }
 }

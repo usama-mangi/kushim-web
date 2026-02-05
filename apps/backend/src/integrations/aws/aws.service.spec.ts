@@ -1,10 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AwsService } from './aws.service';
-import { IAMClient, ListUsersCommand, ListMFADevicesCommand } from '@aws-sdk/client-iam';
-import { S3Client, ListBucketsCommand, GetBucketEncryptionCommand } from '@aws-sdk/client-s3';
-import { CloudTrailClient, LookupEventsCommand } from '@aws-sdk/client-cloudtrail';
-
+import {
+  IAMClient,
+  ListUsersCommand,
+  ListMFADevicesCommand,
+} from '@aws-sdk/client-iam';
+import {
+  S3Client,
+  ListBucketsCommand,
+  GetBucketEncryptionCommand,
+} from '@aws-sdk/client-s3';
+import {
+  CloudTrailClient,
+  LookupEventsCommand,
+} from '@aws-sdk/client-cloudtrail';
 
 // Mock ConfigService
 const mockConfigService = {
@@ -71,11 +81,15 @@ describe('AwsService', () => {
       mockIamSend.mockImplementationOnce(async (command) => {
         if (command instanceof ListUsersCommand) {
           return {
-            Users: [{ UserName: 'user1', UserId: 'u1', CreateDate: new Date() }],
+            Users: [
+              { UserName: 'user1', UserId: 'u1', CreateDate: new Date() },
+            ],
           };
         }
         if (command instanceof ListMFADevicesCommand) {
-            return { MFADevices: [{ SerialNumber: 'arn:aws:iam::123:mfa/user1' }] };
+          return {
+            MFADevices: [{ SerialNumber: 'arn:aws:iam::123:mfa/user1' }],
+          };
         }
         return {};
       });
@@ -86,11 +100,15 @@ describe('AwsService', () => {
       mockIamSend.mockImplementation(async (command) => {
         if (command instanceof ListUsersCommand) {
           return {
-            Users: [{ UserName: 'user1', UserId: 'u1', CreateDate: new Date() }],
+            Users: [
+              { UserName: 'user1', UserId: 'u1', CreateDate: new Date() },
+            ],
           };
         }
         if (command instanceof ListMFADevicesCommand) {
-          return { MFADevices: [{ SerialNumber: 'arn:aws:iam::123:mfa/user1' }] };
+          return {
+            MFADevices: [{ SerialNumber: 'arn:aws:iam::123:mfa/user1' }],
+          };
         }
       });
 
@@ -106,22 +124,22 @@ describe('AwsService', () => {
         if (command instanceof ListUsersCommand) {
           return {
             Users: [
-                { UserName: 'user1', UserId: 'u1', CreateDate: new Date() },
-                { UserName: 'user2', UserId: 'u2', CreateDate: new Date() }
+              { UserName: 'user1', UserId: 'u1', CreateDate: new Date() },
+              { UserName: 'user2', UserId: 'u2', CreateDate: new Date() },
             ],
           };
         }
         if (command instanceof ListMFADevicesCommand) {
-           // Getting the username from the command input would be nice, but checking args is complex in this mock structure
-           // Let's assume user1 has MFA, user2 doesn't.
-           // However, the command instance doesn't easily expose the input in this simple mock
-           // We can inspect mock calls if needed, but for simple return based on call order it's tricky since it's Promise.all
-           
-           // A better approach for the mock:
-           if (command.input.UserName === 'user1') {
-               return { MFADevices: [{ SerialNumber: 'mfa1' }] };
-           }
-           return { MFADevices: [] };
+          // Getting the username from the command input would be nice, but checking args is complex in this mock structure
+          // Let's assume user1 has MFA, user2 doesn't.
+          // However, the command instance doesn't easily expose the input in this simple mock
+          // We can inspect mock calls if needed, but for simple return based on call order it's tricky since it's Promise.all
+
+          // A better approach for the mock:
+          if (command.input.UserName === 'user1') {
+            return { MFADevices: [{ SerialNumber: 'mfa1' }] };
+          }
+          return { MFADevices: [] };
         }
       });
 
@@ -144,7 +162,13 @@ describe('AwsService', () => {
         if (command instanceof GetBucketEncryptionCommand) {
           return {
             ServerSideEncryptionConfiguration: {
-              Rules: [{ ApplyServerSideEncryptionByDefault: { SSEAlgorithm: 'AES256' } }],
+              Rules: [
+                {
+                  ApplyServerSideEncryptionByDefault: {
+                    SSEAlgorithm: 'AES256',
+                  },
+                },
+              ],
             },
           };
         }
@@ -181,25 +205,29 @@ describe('AwsService', () => {
         if (command instanceof LookupEventsCommand) {
           return {
             Events: [
-                { EventName: 'ConsoleLogin', EventTime: new Date(), Username: 'user1' }
+              {
+                EventName: 'ConsoleLogin',
+                EventTime: new Date(),
+                Username: 'user1',
+              },
             ],
           };
         }
       });
 
       const result = await service.collectCloudTrailEvidence();
-      
+
       expect(result.status).toBe('PASS');
       expect(result.data.hasRecentActivity).toBe(true);
     });
 
     it('should return WARNING when no events are found', async () => {
       mockCloudTrailSend.mockImplementation(async (command) => {
-         return { Events: [] };
+        return { Events: [] };
       });
 
       const result = await service.collectCloudTrailEvidence();
-      
+
       expect(result.status).toBe('WARNING');
       expect(result.data.hasRecentActivity).toBe(false);
     });

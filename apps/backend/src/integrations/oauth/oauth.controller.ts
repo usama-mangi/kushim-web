@@ -1,4 +1,13 @@
-import { Controller, Get, Param, Request, UseGuards, Res, Query, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Request,
+  UseGuards,
+  Res,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { OAuthService } from './oauth.service';
 import type { Response } from 'express';
@@ -14,11 +23,11 @@ export class OAuthController {
 
   @Get(':platform/authorize')
   @UseGuards(AuthGuard('jwt'))
-  async authorize(
-    @Param('platform') platform: string,
-    @Request() req: any,
-  ) {
-    const url = await this.oauthService.getAuthorizeUrl(platform, req.user.customerId);
+  async authorize(@Param('platform') platform: string, @Request() req: any) {
+    const url = await this.oauthService.getAuthorizeUrl(
+      platform,
+      req.user.customerId,
+    );
     return { url };
   }
 
@@ -43,24 +52,39 @@ export class OAuthController {
       console.log(`[OAuthController] Decrypted customerId: ${customerId}`);
 
       if (!customerId) {
-        console.error(`[OAuthController] CustomerId missing in state for ${platform}`);
+        console.error(
+          `[OAuthController] CustomerId missing in state for ${platform}`,
+        );
         throw new BadRequestException('Invalid state: customerId missing');
       }
 
       console.log(`[OAuthController] Exchanging token for ${platform}...`);
-      const result = await this.oauthService.exchangeToken(platform, code, customerId);
-      console.log(`[OAuthController] Token exchange successful for ${platform}. Result:`, result);
+      const result = await this.oauthService.exchangeToken(
+        platform,
+        code,
+        customerId,
+      );
+      console.log(
+        `[OAuthController] Token exchange successful for ${platform}. Result:`,
+        result,
+      );
 
       // Redirect back to frontend
-      const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
-      const setupParam = (result as any)?.setupRequired ? '&setup_required=true' : '';
+      const frontendUrl =
+        this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
+      const setupParam = (result as any)?.setupRequired
+        ? '&setup_required=true'
+        : '';
       const redirectUrl = `${frontendUrl}/integrations?success=true&platform=${platform}${setupParam}`;
       console.log(`[OAuthController] Redirecting to: ${redirectUrl}`);
       return res.redirect(redirectUrl);
     } catch (error) {
       console.error(`[OAuthController] FAILED for ${platform}:`, error);
-      const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
-      return res.redirect(`${frontendUrl}/integrations?error=oauth_failed&platform=${platform}`);
+      const frontendUrl =
+        this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
+      return res.redirect(
+        `${frontendUrl}/integrations?error=oauth_failed&platform=${platform}`,
+      );
     }
   }
 }

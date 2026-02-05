@@ -82,7 +82,9 @@ export class CircuitBreaker {
 
     if (this.failureCount >= this.failureThreshold) {
       this.state = 'OPEN';
-      console.warn(`Circuit breaker opened after ${this.failureCount} failures`);
+      console.warn(
+        `Circuit breaker opened after ${this.failureCount} failures`,
+      );
     }
   }
 

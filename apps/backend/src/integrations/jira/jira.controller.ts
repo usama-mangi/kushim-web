@@ -1,4 +1,14 @@
-import { Controller, Post, Body, Get, Param, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { JiraService } from './jira.service';
 import { IntegrationsService } from '../integrations.service';
@@ -14,13 +24,19 @@ export class JiraController {
 
   @Get('health')
   async getHealth(@Request() req: any) {
-    const config = await this.integrationsService.getDecryptedConfig(req.user.customerId, IntegrationType.JIRA);
+    const config = await this.integrationsService.getDecryptedConfig(
+      req.user.customerId,
+      IntegrationType.JIRA,
+    );
     const isConnected = await this.jiraService.checkConnection(config);
     const circuitBreakerStatus = this.jiraService.getCircuitBreakerStatus();
 
     return {
       integration: 'jira',
-      status: isConnected && circuitBreakerStatus.state !== 'OPEN' ? 'healthy' : 'unhealthy',
+      status:
+        isConnected && circuitBreakerStatus.state !== 'OPEN'
+          ? 'healthy'
+          : 'unhealthy',
       circuitBreaker: circuitBreakerStatus,
       timestamp: new Date(),
     };
@@ -39,7 +55,10 @@ export class JiraController {
       projectKey: string;
     },
   ) {
-    const config = await this.integrationsService.getDecryptedConfig(req.user.customerId, IntegrationType.JIRA);
+    const config = await this.integrationsService.getDecryptedConfig(
+      req.user.customerId,
+      IntegrationType.JIRA,
+    );
     return await this.jiraService.createRemediationTicket({ ...body, config });
   }
 
@@ -50,13 +69,23 @@ export class JiraController {
     @Param('issueKey') issueKey: string,
     @Body() body: { status: string },
   ) {
-    const config = await this.integrationsService.getDecryptedConfig(req.user.customerId, IntegrationType.JIRA);
-    return await this.jiraService.updateTicketStatus(issueKey, body.status, config);
+    const config = await this.integrationsService.getDecryptedConfig(
+      req.user.customerId,
+      IntegrationType.JIRA,
+    );
+    return await this.jiraService.updateTicketStatus(
+      issueKey,
+      body.status,
+      config,
+    );
   }
 
   @Get('ticket/:issueKey/sync')
   async syncTicket(@Request() req: any, @Param('issueKey') issueKey: string) {
-    const config = await this.integrationsService.getDecryptedConfig(req.user.customerId, IntegrationType.JIRA);
+    const config = await this.integrationsService.getDecryptedConfig(
+      req.user.customerId,
+      IntegrationType.JIRA,
+    );
     return await this.jiraService.syncTicketStatus(issueKey, config);
   }
 }

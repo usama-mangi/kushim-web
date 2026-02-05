@@ -43,7 +43,11 @@ export class EvidenceCollectionProcessor {
     ];
 
     for (const key of sensitiveKeys) {
-      if (decrypted[key] && typeof decrypted[key] === 'string' && decrypted[key].includes(':')) {
+      if (
+        decrypted[key] &&
+        typeof decrypted[key] === 'string' &&
+        decrypted[key].includes(':')
+      ) {
         try {
           decrypted[key] = decrypt(decrypted[key]);
         } catch (error) {
@@ -57,8 +61,10 @@ export class EvidenceCollectionProcessor {
   @Process(EvidenceCollectionJobType.COLLECT_AWS)
   async handleAwsCollection(job: Job<EvidenceCollectionJobData>) {
     const { customerId, integrationId, controlId } = job.data;
-    this.logger.log(`Processing AWS evidence collection for customer ${customerId}, control ${controlId}`);
-    
+    this.logger.log(
+      `Processing AWS evidence collection for customer ${customerId}, control ${controlId}`,
+    );
+
     try {
       const integration = await this.prisma.integration.findUnique({
         where: { id: integrationId },
@@ -69,7 +75,9 @@ export class EvidenceCollectionProcessor {
       }
 
       if (integration.customerId !== customerId) {
-        throw new Error(`Integration ${integrationId} does not belong to customer ${customerId}`);
+        throw new Error(
+          `Integration ${integrationId} does not belong to customer ${customerId}`,
+        );
       }
 
       const control = await this.prisma.control.findUnique({
@@ -89,9 +97,11 @@ export class EvidenceCollectionProcessor {
         case 'CC6.1.2':
         case 'CC6.1.5':
           if (control.title.includes('AWS')) {
-             evidenceData = await this.awsService.collectIamEvidence(credentials);
+            evidenceData =
+              await this.awsService.collectIamEvidence(credentials);
           } else {
-             evidenceData = await this.awsService.collectIamEvidence(credentials);
+            evidenceData =
+              await this.awsService.collectIamEvidence(credentials);
           }
           break;
         case 'CC6.7':
@@ -103,10 +113,13 @@ export class EvidenceCollectionProcessor {
         case 'CC7.2':
         case 'CC7.2.3':
         case 'CC7.2.4':
-          evidenceData = await this.awsService.collectCloudTrailEvidence(credentials);
+          evidenceData =
+            await this.awsService.collectCloudTrailEvidence(credentials);
           break;
         default:
-          this.logger.warn(`Unknown mapping for control ${control.controlId} in AWS, defaulting to IAM`);
+          this.logger.warn(
+            `Unknown mapping for control ${control.controlId} in AWS, defaulting to IAM`,
+          );
           evidenceData = await this.awsService.collectIamEvidence(credentials);
       }
 
@@ -115,14 +128,18 @@ export class EvidenceCollectionProcessor {
         controlId,
         integrationId,
         evidenceData,
-        String(job.id)
+        String(job.id),
       );
 
-      this.logger.log(`Evidence collected and secured for control ${controlId}. Hash: ${savedEvidence.hash.substring(0, 8)}...`);
+      this.logger.log(
+        `Evidence collected and secured for control ${controlId}. Hash: ${savedEvidence.hash.substring(0, 8)}...`,
+      );
       return { success: true, evidenceId: savedEvidence.id };
-
     } catch (error) {
-      this.logger.error(`Failed AWS evidence collection for job ${job.id}:`, error);
+      this.logger.error(
+        `Failed AWS evidence collection for job ${job.id}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -130,8 +147,10 @@ export class EvidenceCollectionProcessor {
   @Process(EvidenceCollectionJobType.COLLECT_GITHUB)
   async handleGitHubCollection(job: Job<EvidenceCollectionJobData>) {
     const { customerId, integrationId, controlId } = job.data;
-    this.logger.log(`Processing GitHub evidence collection for customer ${customerId}`);
-    
+    this.logger.log(
+      `Processing GitHub evidence collection for customer ${customerId}`,
+    );
+
     try {
       const integration = await this.prisma.integration.findUnique({
         where: { id: integrationId },
@@ -155,19 +174,25 @@ export class EvidenceCollectionProcessor {
       switch (control.controlId) {
         case 'CC7.1.1': // IaC repos monitoring
         case 'CC8.1.2': // Branch protection / Peer review
-          evidenceData = await this.githubService.collectBranchProtectionEvidence(config);
+          evidenceData =
+            await this.githubService.collectBranchProtectionEvidence(config);
           break;
         case 'CC8.1.3': // CI/CD / Commit signing
-          evidenceData = await this.githubService.collectCommitSigningEvidence(config);
+          evidenceData =
+            await this.githubService.collectCommitSigningEvidence(config);
           break;
         case 'CC7.2':
         case 'CC7.2.1': // SAST
         case 'CC7.2.2': // Dependabot
-          evidenceData = await this.githubService.collectSecurityEvidence(config);
+          evidenceData =
+            await this.githubService.collectSecurityEvidence(config);
           break;
         default:
-          this.logger.warn(`Unknown mapping for control ${control.controlId} in GitHub, defaulting to Branch Protection`);
-          evidenceData = await this.githubService.collectBranchProtectionEvidence(config);
+          this.logger.warn(
+            `Unknown mapping for control ${control.controlId} in GitHub, defaulting to Branch Protection`,
+          );
+          evidenceData =
+            await this.githubService.collectBranchProtectionEvidence(config);
       }
 
       const savedEvidence = await this.storeEvidence(
@@ -175,13 +200,16 @@ export class EvidenceCollectionProcessor {
         controlId,
         integrationId,
         evidenceData,
-        String(job.id)
+        String(job.id),
       );
 
       this.logger.log(`GitHub evidence collected: ${savedEvidence.id}`);
       return { success: true, jobId: job.id, evidenceId: savedEvidence.id };
     } catch (error) {
-      this.logger.error(`Failed GitHub evidence collection for job ${job.id}:`, error);
+      this.logger.error(
+        `Failed GitHub evidence collection for job ${job.id}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -189,8 +217,10 @@ export class EvidenceCollectionProcessor {
   @Process(EvidenceCollectionJobType.COLLECT_OKTA)
   async handleOktaCollection(job: Job<EvidenceCollectionJobData>) {
     const { customerId, integrationId, controlId } = job.data;
-    this.logger.log(`Processing Okta evidence collection for customer ${customerId}, control ${controlId}`);
-    
+    this.logger.log(
+      `Processing Okta evidence collection for customer ${customerId}, control ${controlId}`,
+    );
+
     try {
       const integration = await this.prisma.integration.findUnique({
         where: { id: integrationId },
@@ -214,19 +244,25 @@ export class EvidenceCollectionProcessor {
       switch (control.controlId) {
         case 'CC6.1':
         case 'CC6.1.3':
-          evidenceData = await this.oktaService.collectMfaEnforcementEvidence(config);
+          evidenceData =
+            await this.oktaService.collectMfaEnforcementEvidence(config);
           break;
         case 'CC6.2':
         case 'CC6.2.1':
         case 'CC6.2.2':
-          evidenceData = await this.oktaService.collectUserAccessEvidence(config);
+          evidenceData =
+            await this.oktaService.collectUserAccessEvidence(config);
           break;
         case 'CC6.1.4':
-          evidenceData = await this.oktaService.collectPolicyComplianceEvidence(config);
+          evidenceData =
+            await this.oktaService.collectPolicyComplianceEvidence(config);
           break;
         default:
-          this.logger.warn(`Unknown Okta mapping for ${control.controlId}, defaulting to User Access`);
-          evidenceData = await this.oktaService.collectUserAccessEvidence(config);
+          this.logger.warn(
+            `Unknown Okta mapping for ${control.controlId}, defaulting to User Access`,
+          );
+          evidenceData =
+            await this.oktaService.collectUserAccessEvidence(config);
       }
 
       const savedEvidence = await this.storeEvidence(
@@ -234,13 +270,16 @@ export class EvidenceCollectionProcessor {
         controlId,
         integrationId,
         evidenceData,
-        String(job.id)
+        String(job.id),
       );
 
       this.logger.log(`Okta evidence collected: ${savedEvidence.id}`);
       return { success: true, jobId: job.id, evidenceId: savedEvidence.id };
     } catch (error) {
-      this.logger.error(`Failed Okta evidence collection for job ${job.id}:`, error);
+      this.logger.error(
+        `Failed Okta evidence collection for job ${job.id}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -264,8 +303,11 @@ export class EvidenceCollectionProcessor {
     if (sizeInBytes > MAX_DB_SIZE) {
       const timestamp = now.getTime();
       const key = `evidence/${customerId}/${controlId}/${timestamp}-${jobId}.json`;
-      const uploadResult = await this.awsService.uploadEvidenceToS3(key, contentBuffer);
-      
+      const uploadResult = await this.awsService.uploadEvidenceToS3(
+        key,
+        contentBuffer,
+      );
+
       if (uploadResult) {
         s3Key = key;
         storedData = {
@@ -274,8 +316,11 @@ export class EvidenceCollectionProcessor {
           bucket: uploadResult.bucket,
           key: uploadResult.key,
           size: sizeInBytes,
-          originalContentHash: crypto.createHash('sha256').update(contentBuffer).digest('hex'),
-          summary: 'Evidence data offloaded to S3 due to size limit'
+          originalContentHash: crypto
+            .createHash('sha256')
+            .update(contentBuffer)
+            .digest('hex'),
+          summary: 'Evidence data offloaded to S3 due to size limit',
         };
       }
     }
@@ -286,7 +331,10 @@ export class EvidenceCollectionProcessor {
       data: storedData,
       timestamp: now.toISOString(),
     });
-    const hash = crypto.createHash('sha256').update(contentToHash).digest('hex');
+    const hash = crypto
+      .createHash('sha256')
+      .update(contentToHash)
+      .digest('hex');
 
     const previousEvidence = await this.prisma.evidence.findFirst({
       where: { customerId, controlId },

@@ -63,19 +63,19 @@ describe('OktaService', () => {
         { id: 'u2', status: 'ACTIVE', profile: { email: 'u2@example.com' } },
       ]);
       const mockListFactors = jest.fn().mockImplementation((params) => {
-         if (params.userId === 'u1' || params.userId === 'u2') {
-             return [{ id: 'f1', factorType: 'push', status: 'ACTIVE' }];
-         }
-         return [];
+        if (params.userId === 'u1' || params.userId === 'u2') {
+          return [{ id: 'f1', factorType: 'push', status: 'ACTIVE' }];
+        }
+        return [];
       });
 
       (okta.Client as unknown as jest.Mock).mockImplementation(() => ({
         userApi: {
-            listUsers: mockListUsers,
+          listUsers: mockListUsers,
         },
         userFactorApi: {
-            listFactors: mockListFactors
-        }
+          listFactors: mockListFactors,
+        },
       }));
 
       // Re-create service
@@ -107,8 +107,8 @@ describe('OktaService', () => {
 
       (okta.Client as unknown as jest.Mock).mockImplementation(() => ({
         userApi: {
-            listUsers: mockListUsers,
-        }
+          listUsers: mockListUsers,
+        },
       }));
 
       // Re-create service

@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Octokit } from '@octokit/rest';
-import { retryWithBackoff, CircuitBreaker } from '../../common/utils/retry.util';
+import {
+  retryWithBackoff,
+  CircuitBreaker,
+} from '../../common/utils/retry.util';
 
 @Injectable()
 export class GitHubService {
@@ -35,9 +38,9 @@ export class GitHubService {
     try {
       const clientConfig = this.getClientConfig(config);
       const octokit = this.getOctokit(clientConfig?.token);
-      
+
       this.logger.log(`Fetching repositories for ${clientConfig?.owner}`);
-      
+
       const response = await octokit.repos.listForAuthenticatedUser({
         sort: 'updated',
         per_page: 100,
@@ -71,13 +74,20 @@ export class GitHubService {
    */
   async collectBranchProtectionEvidence(config?: any) {
     const clientConfig = this.getClientConfig(config);
-    const owner = clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
+    const owner =
+      clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
     const repos = clientConfig?.repos || [];
     const token = clientConfig?.token;
 
-    this.logger.log(`Collecting branch protection evidence for ${owner} across ${repos.length} repos...`);
+    this.logger.log(
+      `Collecting branch protection evidence for ${owner} across ${repos.length} repos...`,
+    );
     const octokit = this.getOctokit(token);
-    const allReposResults: { repo: string; totalMain: number; protectedMain: number }[] = [];
+    const allReposResults: {
+      repo: string;
+      totalMain: number;
+      protectedMain: number;
+    }[] = [];
 
     for (const repo of repos) {
       try {
@@ -96,7 +106,9 @@ export class GitHubService {
           }
         }
 
-        const main = status.filter((b) => ['main', 'master', 'production'].includes(b.branchName));
+        const main = status.filter((b) =>
+          ['main', 'master', 'production'].includes(b.branchName),
+        );
         const protectedMain = main.filter((b) => b.protected);
         allReposResults.push({
           repo,
@@ -111,9 +123,16 @@ export class GitHubService {
       }
     }
 
-    const totalMainBranches = allReposResults.reduce((sum, r) => sum + r.totalMain, 0);
-    const protectedMainBranches = allReposResults.reduce((sum, r) => sum + r.protectedMain, 0);
-    const complianceRate = totalMainBranches > 0 ? protectedMainBranches / totalMainBranches : 1;
+    const totalMainBranches = allReposResults.reduce(
+      (sum, r) => sum + r.totalMain,
+      0,
+    );
+    const protectedMainBranches = allReposResults.reduce(
+      (sum, r) => sum + r.protectedMain,
+      0,
+    );
+    const complianceRate =
+      totalMainBranches > 0 ? protectedMainBranches / totalMainBranches : 1;
 
     return {
       type: 'BRANCH_PROTECTION',
@@ -135,18 +154,28 @@ export class GitHubService {
    */
   async collectCommitSigningEvidence(config?: any) {
     const clientConfig = this.getClientConfig(config);
-    const owner = clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
+    const owner =
+      clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
     const repos = clientConfig?.repos || [];
     const token = clientConfig?.token;
 
-    this.logger.log(`Collecting commit signing evidence for ${owner} across ${repos.length} repos...`);
+    this.logger.log(
+      `Collecting commit signing evidence for ${owner} across ${repos.length} repos...`,
+    );
     const octokit = this.getOctokit(token);
-    const allReposResults: { repo: string; total: number; verified: number }[] = [];
+    const allReposResults: { repo: string; total: number; verified: number }[] =
+      [];
 
     for (const repo of repos) {
       try {
-        const commits = await octokit.repos.listCommits({ owner, repo, per_page: 20 });
-        const verified = commits.data.filter((c) => c.commit.verification?.verified).length;
+        const commits = await octokit.repos.listCommits({
+          owner,
+          repo,
+          per_page: 20,
+        });
+        const verified = commits.data.filter(
+          (c) => c.commit.verification?.verified,
+        ).length;
         allReposResults.push({ repo, total: commits.data.length, verified });
         await new Promise((resolve) => setTimeout(resolve, 50));
       } catch (e) {
@@ -155,7 +184,10 @@ export class GitHubService {
     }
 
     const totalCommits = allReposResults.reduce((sum, r) => sum + r.total, 0);
-    const signedCommits = allReposResults.reduce((sum, r) => sum + r.verified, 0);
+    const signedCommits = allReposResults.reduce(
+      (sum, r) => sum + r.verified,
+      0,
+    );
     const signingRate = totalCommits > 0 ? signedCommits / totalCommits : 0;
 
     return {
@@ -178,11 +210,14 @@ export class GitHubService {
    */
   async collectSecurityEvidence(config?: any) {
     const clientConfig = this.getClientConfig(config);
-    const owner = clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
+    const owner =
+      clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
     const repos = clientConfig?.repos || [];
     const token = clientConfig?.token;
 
-    this.logger.log(`Collecting security evidence for ${owner} across ${repos.length} repos...`);
+    this.logger.log(
+      `Collecting security evidence for ${owner} across ${repos.length} repos...`,
+    );
     const octokit = this.getOctokit(token);
     const allReposResults: { repo: string; score: number }[] = [];
 
@@ -190,18 +225,24 @@ export class GitHubService {
       try {
         const [repository, vulnerabilityAlerts] = await Promise.all([
           octokit.repos.get({ owner, repo }),
-          octokit.repos.checkVulnerabilityAlerts({ owner, repo }).catch(() => ({ status: 404 })),
+          octokit.repos
+            .checkVulnerabilityAlerts({ owner, repo })
+            .catch(() => ({ status: 404 })),
         ]);
 
         const securityFeatures = {
           vulnerabilityAlertsEnabled: vulnerabilityAlerts.status === 204,
-          hasSecurityPolicy: (repository.data as any).security_and_analysis?.secret_scanning?.status === 'enabled',
+          hasSecurityPolicy:
+            (repository.data as any).security_and_analysis?.secret_scanning
+              ?.status === 'enabled',
           privateRepo: repository.data.private,
         };
 
         allReposResults.push({
           repo,
-          score: Object.values(securityFeatures).filter(Boolean).length / Object.keys(securityFeatures).length,
+          score:
+            Object.values(securityFeatures).filter(Boolean).length /
+            Object.keys(securityFeatures).length,
         });
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (e) {
@@ -211,7 +252,8 @@ export class GitHubService {
 
     const securityScore =
       allReposResults.length > 0
-        ? allReposResults.reduce((sum, r) => sum + r.score, 0) / allReposResults.length
+        ? allReposResults.reduce((sum, r) => sum + r.score, 0) /
+          allReposResults.length
         : 0;
 
     return {
@@ -243,9 +285,12 @@ export class GitHubService {
         security.data.securityScore,
       ];
 
-      const healthScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      const healthScore =
+        scores.reduce((sum, score) => sum + score, 0) / scores.length;
 
-      this.logger.log(`GitHub health score calculated across all repos: ${(healthScore * 100).toFixed(2)}%`);
+      this.logger.log(
+        `GitHub health score calculated across all repos: ${(healthScore * 100).toFixed(2)}%`,
+      );
 
       return healthScore;
     } catch (error) {

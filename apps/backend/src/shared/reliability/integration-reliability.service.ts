@@ -47,19 +47,25 @@ export class IntegrationReliabilityService {
   /**
    * Check health of all integrations
    */
-  async checkAllIntegrationsHealth(customerId: string): Promise<IntegrationReliabilityMetrics> {
+  async checkAllIntegrationsHealth(
+    customerId: string,
+  ): Promise<IntegrationReliabilityMetrics> {
     if (!customerId) {
-        this.logger.warn('Attempted to check integration health without a valid customerId');
-        return {
-            totalIntegrations: 0,
-            healthyIntegrations: 0,
-            degradedIntegrations: 0,
-            unhealthyIntegrations: 0,
-            averageHealthScore: 0,
-            integrations: {},
-        };
+      this.logger.warn(
+        'Attempted to check integration health without a valid customerId',
+      );
+      return {
+        totalIntegrations: 0,
+        healthyIntegrations: 0,
+        degradedIntegrations: 0,
+        unhealthyIntegrations: 0,
+        averageHealthScore: 0,
+        integrations: {},
+      };
     }
-    this.logger.log(`Checking health of all integrations for customer ${customerId}...`);
+    this.logger.log(
+      `Checking health of all integrations for customer ${customerId}...`,
+    );
 
     const integrationChecks = await Promise.allSettled([
       this.checkAwsHealth(customerId),
@@ -90,12 +96,19 @@ export class IntegrationReliabilityService {
       })
       .filter((i): i is IntegrationHealth => i !== null);
 
-    const healthyIntegrations = integrationList.filter((i) => i.status === 'healthy').length;
-    const degradedIntegrations = integrationList.filter((i) => i.status === 'degraded').length;
-    const unhealthyIntegrations = integrationList.filter((i) => i.status === 'unhealthy').length;
+    const healthyIntegrations = integrationList.filter(
+      (i) => i.status === 'healthy',
+    ).length;
+    const degradedIntegrations = integrationList.filter(
+      (i) => i.status === 'degraded',
+    ).length;
+    const unhealthyIntegrations = integrationList.filter(
+      (i) => i.status === 'unhealthy',
+    ).length;
 
     const averageHealthScore =
-      integrationList.reduce((sum, i) => sum + (i.healthScore || 0), 0) / integrationList.length;
+      integrationList.reduce((sum, i) => sum + (i.healthScore || 0), 0) /
+      integrationList.length;
 
     // Convert list to object map
     const integrationsMap: Record<string, IntegrationHealth> = {};
@@ -133,7 +146,11 @@ export class IntegrationReliabilityService {
     ];
 
     for (const key of sensitiveKeys) {
-      if (decrypted[key] && typeof decrypted[key] === 'string' && decrypted[key].includes(':')) {
+      if (
+        decrypted[key] &&
+        typeof decrypted[key] === 'string' &&
+        decrypted[key].includes(':')
+      ) {
         try {
           decrypted[key] = decrypt(decrypted[key]);
         } catch (error) {
@@ -147,10 +164,12 @@ export class IntegrationReliabilityService {
   /**
    * Check AWS integration health
    */
-  private async checkAwsHealth(customerId: string): Promise<IntegrationHealth | null> {
+  private async checkAwsHealth(
+    customerId: string,
+  ): Promise<IntegrationHealth | null> {
     try {
       const integration = await this.prisma.integration.findFirst({
-        where: { customerId, type: IntegrationType.AWS }
+        where: { customerId, type: IntegrationType.AWS },
       });
 
       if (!integration) {
@@ -166,8 +185,8 @@ export class IntegrationReliabilityService {
         status: this.determineStatus(healthScore, circuitBreaker.failureCount),
         healthScore,
         circuitBreaker: {
-            state: circuitBreaker.state,
-            failureCount: circuitBreaker.failureCount
+          state: circuitBreaker.state,
+          failureCount: circuitBreaker.failureCount,
         },
         lastChecked: new Date(),
       };
@@ -180,36 +199,50 @@ export class IntegrationReliabilityService {
   /**
    * Check GitHub integration health
    */
-  private async checkGitHubHealth(customerId: string): Promise<IntegrationHealth | null> {
+  private async checkGitHubHealth(
+    customerId: string,
+  ): Promise<IntegrationHealth | null> {
     try {
-      console.log(`[ReliabilityService] Checking GitHub health for customer: ${customerId}`);
+      console.log(
+        `[ReliabilityService] Checking GitHub health for customer: ${customerId}`,
+      );
       const integration = await this.prisma.integration.findFirst({
-        where: { customerId, type: IntegrationType.GITHUB }
+        where: { customerId, type: IntegrationType.GITHUB },
       });
 
       if (!integration) {
-        console.log(`[ReliabilityService] No GitHub integration found for customer: ${customerId}`);
+        console.log(
+          `[ReliabilityService] No GitHub integration found for customer: ${customerId}`,
+        );
         return null;
       }
 
-      console.log(`[ReliabilityService] Found GitHub integration for ${customerId}. Config:`, { 
-        ...(integration.config as any), 
-        token: '***' // Hide token
-      });
+      console.log(
+        `[ReliabilityService] Found GitHub integration for ${customerId}. Config:`,
+        {
+          ...(integration.config as any),
+          token: '***', // Hide token
+        },
+      );
       const config = this.decryptConfig(integration.config);
       const circuitBreaker = this.githubService.getCircuitBreakerStatus();
-      
+
       const healthScore = await this.githubService.calculateHealthScore(config);
-      const status = this.determineStatus(healthScore, circuitBreaker.failureCount);
-      console.log(`[ReliabilityService] GitHub health score: ${healthScore}, Status: ${status}`);
+      const status = this.determineStatus(
+        healthScore,
+        circuitBreaker.failureCount,
+      );
+      console.log(
+        `[ReliabilityService] GitHub health score: ${healthScore}, Status: ${status}`,
+      );
 
       return {
         integration: 'github',
         status,
         healthScore,
         circuitBreaker: {
-            state: circuitBreaker.state,
-            failureCount: circuitBreaker.failureCount
+          state: circuitBreaker.state,
+          failureCount: circuitBreaker.failureCount,
         },
         lastChecked: new Date(),
       };
@@ -222,10 +255,12 @@ export class IntegrationReliabilityService {
   /**
    * Check Okta integration health
    */
-  private async checkOktaHealth(customerId: string): Promise<IntegrationHealth | null> {
+  private async checkOktaHealth(
+    customerId: string,
+  ): Promise<IntegrationHealth | null> {
     try {
       const integration = await this.prisma.integration.findFirst({
-        where: { customerId, type: IntegrationType.OKTA }
+        where: { customerId, type: IntegrationType.OKTA },
       });
 
       if (!integration) {
@@ -241,8 +276,8 @@ export class IntegrationReliabilityService {
         status: this.determineStatus(healthScore, circuitBreaker.failureCount),
         healthScore,
         circuitBreaker: {
-            state: circuitBreaker.state,
-            failureCount: circuitBreaker.failureCount
+          state: circuitBreaker.state,
+          failureCount: circuitBreaker.failureCount,
         },
         lastChecked: new Date(),
       };
@@ -255,10 +290,12 @@ export class IntegrationReliabilityService {
   /**
    * Check Jira integration health
    */
-  private async checkJiraHealth(customerId: string): Promise<IntegrationHealth | null> {
+  private async checkJiraHealth(
+    customerId: string,
+  ): Promise<IntegrationHealth | null> {
     try {
       const integration = await this.prisma.integration.findFirst({
-        where: { customerId, type: IntegrationType.JIRA }
+        where: { customerId, type: IntegrationType.JIRA },
       });
 
       if (!integration) {
@@ -268,16 +305,19 @@ export class IntegrationReliabilityService {
       const config = this.decryptConfig(integration.config);
       const circuitBreaker = this.jiraService.getCircuitBreakerStatus();
       const isConnected = await this.jiraService.checkConnection(config);
-      
-      const status = isConnected && circuitBreaker.state !== 'OPEN' ? 'healthy' : 'unhealthy';
+
+      const status =
+        isConnected && circuitBreaker.state !== 'OPEN'
+          ? 'healthy'
+          : 'unhealthy';
 
       return {
         integration: 'jira',
         status,
         healthScore: status === 'healthy' ? 1 : 0,
         circuitBreaker: {
-            state: circuitBreaker.state,
-            failureCount: circuitBreaker.failureCount
+          state: circuitBreaker.state,
+          failureCount: circuitBreaker.failureCount,
         },
         lastChecked: new Date(),
       };
@@ -290,10 +330,12 @@ export class IntegrationReliabilityService {
   /**
    * Check Slack integration health
    */
-  private async checkSlackHealth(customerId: string): Promise<IntegrationHealth | null> {
+  private async checkSlackHealth(
+    customerId: string,
+  ): Promise<IntegrationHealth | null> {
     try {
       const integration = await this.prisma.integration.findFirst({
-        where: { customerId, type: IntegrationType.SLACK }
+        where: { customerId, type: IntegrationType.SLACK },
       });
 
       if (!integration) {
@@ -302,17 +344,22 @@ export class IntegrationReliabilityService {
 
       const config = this.decryptConfig(integration.config);
       const circuitBreaker = this.slackService.getCircuitBreakerStatus();
-      const isConnected = await this.slackService.checkConnection(config.webhookUrl);
+      const isConnected = await this.slackService.checkConnection(
+        config.webhookUrl,
+      );
 
-      const status = isConnected && circuitBreaker.state !== 'OPEN' ? 'healthy' : 'unhealthy';
+      const status =
+        isConnected && circuitBreaker.state !== 'OPEN'
+          ? 'healthy'
+          : 'unhealthy';
 
       return {
         integration: 'slack',
         status,
         healthScore: status === 'healthy' ? 1 : 0,
         circuitBreaker: {
-            state: circuitBreaker.state,
-            failureCount: circuitBreaker.failureCount
+          state: circuitBreaker.state,
+          failureCount: circuitBreaker.failureCount,
         },
         lastChecked: new Date(),
       };
@@ -344,7 +391,9 @@ export class IntegrationReliabilityService {
   /**
    * Send health alerts to Slack if any integration is unhealthy
    */
-  async sendHealthAlertsIfNeeded(metrics: IntegrationReliabilityMetrics): Promise<void> {
+  async sendHealthAlertsIfNeeded(
+    metrics: IntegrationReliabilityMetrics,
+  ): Promise<void> {
     // metrics.integrations is now a Record, need to convert to array for filtering
     const integrationList = Object.values(metrics.integrations);
     const unhealthyIntegrations = integrationList.filter(
@@ -364,13 +413,18 @@ export class IntegrationReliabilityService {
             `Status: ${integration.status}`,
             `Circuit Breaker: ${integration.circuitBreaker.state}`,
             `Failure Count: ${integration.circuitBreaker.failureCount}`,
-            ...(integration.details ? [JSON.stringify(integration.details)] : []),
+            ...(integration.details
+              ? [JSON.stringify(integration.details)]
+              : []),
           ],
         });
 
         this.logger.log(`Sent health alert for ${integration.integration}`);
       } catch (error) {
-        this.logger.error(`Failed to send health alert for ${integration.integration}:`, error);
+        this.logger.error(
+          `Failed to send health alert for ${integration.integration}:`,
+          error,
+        );
       }
     }
   }

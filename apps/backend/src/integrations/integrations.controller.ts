@@ -1,4 +1,13 @@
-import { Controller, Get, Delete, Post, Param, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Delete,
+  Post,
+  Param,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { IntegrationsService } from './integrations.service';
 import { IntegrationType } from '@prisma/client';
@@ -27,8 +36,14 @@ export class IntegrationsController {
   }
 
   @Delete('type/:type')
-  async deleteIntegrationByType(@Param('type') type: string, @Request() req: any) {
-    return this.integrationsService.deleteIntegrationByType(req.user.customerId, type);
+  async deleteIntegrationByType(
+    @Param('type') type: string,
+    @Request() req: any,
+  ) {
+    return this.integrationsService.deleteIntegrationByType(
+      req.user.customerId,
+      type,
+    );
   }
 
   @Delete(':id')

@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import { retryWithBackoff, CircuitBreaker } from '../../common/utils/retry.util';
+import {
+  retryWithBackoff,
+  CircuitBreaker,
+} from '../../common/utils/retry.util';
 
 @Injectable()
 export class SlackService {
@@ -92,7 +95,8 @@ export class SlackService {
                 },
               ],
               footer: 'Kushim Compliance Platform',
-              footer_icon: 'https://platform.slack-edge.com/img/default_application_icon.png',
+              footer_icon:
+                'https://platform.slack-edge.com/img/default_application_icon.png',
             },
           ],
         };
@@ -127,7 +131,8 @@ export class SlackService {
   }) {
     this.logger.log('Sending daily compliance summary to Slack...');
 
-    const emoji = data.complianceRate >= 0.9 ? ':white_check_mark:' : ':warning:';
+    const emoji =
+      data.complianceRate >= 0.9 ? ':white_check_mark:' : ':warning:';
 
     return await this.sendAlert({
       title: `${emoji} Daily Compliance Summary`,
@@ -146,7 +151,9 @@ export class SlackService {
     issues: string[];
     webhookUrl?: string;
   }) {
-    this.logger.log(`Sending integration health warning for ${data.integration}...`);
+    this.logger.log(
+      `Sending integration health warning for ${data.integration}...`,
+    );
 
     return await this.sendAlert({
       title: `:warning: ${data.integration} Integration Health Warning`,

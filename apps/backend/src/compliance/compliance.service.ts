@@ -1,50 +1,111 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma/prisma.service';
 import { CheckStatus } from '@prisma/client';
+import { CacheService } from '../common/cache/cache.service';
 
 @Injectable()
 export class ComplianceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
-  async getAllControls(customerId: string) {
-    const controls = await this.prisma.control.findMany({
-      include: {
-        complianceChecks: {
-          where: { customerId },
-          orderBy: { checkedAt: 'desc' },
-          take: 1,
+  async getAllControls(
+    customerId: string,
+    page: number = 1,
+    limit: number = 50,
+  ) {
+    const skip = (page - 1) * limit;
+    const cacheKey = `controls:${customerId}:page:${page}:limit:${limit}`;
+
+    // Try cache first
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const [controls, total] = await Promise.all([
+      this.prisma.control.findMany({
+        skip,
+        take: limit,
+        include: {
+          complianceChecks: {
+            where: { customerId },
+            orderBy: { checkedAt: 'desc' },
+            take: 1,
+            select: {
+              status: true,
+              checkedAt: true,
+              nextCheckAt: true,
+            },
+          },
         },
-      },
-    });
+      }),
+      this.prisma.control.count(),
+    ]);
 
-    return controls.map(control => {
-      const lastCheck = control.complianceChecks[0];
-      return {
-        id: control.id,
-        name: control.title,
-        description: control.description,
-        category: control.category,
-        status: lastCheck ? lastCheck.status : 'PENDING',
-        lastCheck: lastCheck ? lastCheck.checkedAt : null,
-        nextCheck: lastCheck ? lastCheck.nextCheckAt : null,
-        frequency: control.frequency,
-        integration: control.integrationType || 'MANUAL',
-      };
-    });
+    const result = {
+      data: controls.map((control) => {
+        const lastCheck = control.complianceChecks[0];
+        return {
+          id: control.id,
+          name: control.title,
+          description: control.description,
+          category: control.category,
+          status: lastCheck ? lastCheck.status : 'PENDING',
+          lastCheck: lastCheck ? lastCheck.checkedAt : null,
+          nextCheck: lastCheck ? lastCheck.nextCheckAt : null,
+          frequency: control.frequency,
+          integration: control.integrationType || 'MANUAL',
+        };
+      }),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+
+    // Cache for 5 minutes
+    await this.cacheService.set(cacheKey, result, 300);
+    return result;
   }
 
   async getControlDetails(customerId: string, controlId: string) {
+    const cacheKey = `control:${customerId}:${controlId}`;
+
+    // Try cache first
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const control = await this.prisma.control.findUnique({
       where: { id: controlId },
       include: {
         complianceChecks: {
           where: { customerId },
           orderBy: { checkedAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            status: true,
+            checkedAt: true,
+            nextCheckAt: true,
+            errorMessage: true,
+          },
         },
         evidence: {
           where: { customerId },
           orderBy: { collectedAt: 'desc' },
           take: 5,
+          select: {
+            id: true,
+            collectedAt: true,
+            hash: true,
+            integrationId: true,
+          },
         },
       },
     });
@@ -53,34 +114,88 @@ export class ComplianceService {
       throw new NotFoundException(`Control ${controlId} not found`);
     }
 
+    // Cache for 3 minutes
+    await this.cacheService.set(cacheKey, control, 180);
     return control;
   }
 
-  async getRecentAlerts(customerId: string) {
-    const checks = await this.prisma.complianceCheck.findMany({
-      where: { 
-        customerId, 
-        status: { in: [CheckStatus.FAIL, CheckStatus.WARNING] } 
-      },
-      include: { control: true },
-      orderBy: { checkedAt: 'desc' },
-      take: 10,
-    });
+  async getRecentAlerts(
+    customerId: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    const skip = (page - 1) * limit;
+    const cacheKey = `alerts:${customerId}:page:${page}:limit:${limit}`;
 
-    return checks.map(check => ({
-      id: check.id,
-      severity: check.status === CheckStatus.FAIL ? 'critical' : 'warning',
-      message: check.errorMessage || `Control ${check.control.controlId} failed validation`,
-      timestamp: check.checkedAt,
-      controlId: check.controlId,
-      controlName: check.control.title,
-      acknowledged: false, // In a real app, this would be in the DB
-    }));
+    // Try cache first
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const [checks, total] = await Promise.all([
+      this.prisma.complianceCheck.findMany({
+        where: {
+          customerId,
+          status: { in: [CheckStatus.FAIL, CheckStatus.WARNING] },
+        },
+        include: {
+          control: {
+            select: {
+              id: true,
+              controlId: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: { checkedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.complianceCheck.count({
+        where: {
+          customerId,
+          status: { in: [CheckStatus.FAIL, CheckStatus.WARNING] },
+        },
+      }),
+    ]);
+
+    const result = {
+      data: checks.map((check) => ({
+        id: check.id,
+        severity: check.status === CheckStatus.FAIL ? 'critical' : 'warning',
+        message:
+          check.errorMessage ||
+          `Control ${check.control.controlId} failed validation`,
+        timestamp: check.checkedAt,
+        controlId: check.controlId,
+        controlName: check.control.title,
+        acknowledged: false,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+
+    // Cache for 1 minute
+    await this.cacheService.set(cacheKey, result, 60);
+    return result;
   }
 
-  async getTrends(customerId: string) {
+  async getTrends(customerId: string, days: number = 7) {
+    const cacheKey = `trends:${customerId}:days:${days}`;
+
+    // Try cache first (15 minutes TTL for compliance scores)
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7);
+    startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
 
     const checks = await this.prisma.complianceCheck.findMany({
@@ -89,33 +204,47 @@ export class ComplianceService {
         checkedAt: { gte: startDate },
       },
       orderBy: { checkedAt: 'asc' },
+      select: {
+        checkedAt: true,
+        controlId: true,
+        status: true,
+      },
     });
 
-    // Group checks by day and only keep the latest check per control per day
     const dailyData: Record<string, Record<string, CheckStatus>> = {};
-    
-    checks.forEach(check => {
+
+    checks.forEach((check) => {
       const day = check.checkedAt.toISOString().split('T')[0];
       if (!dailyData[day]) dailyData[day] = {};
       dailyData[day][check.controlId] = check.status;
     });
 
-    const days = Object.keys(dailyData).sort();
-    
-    // If no data, return some "empty" but structured data instead of nothing
-    if (days.length === 0) {
+    const sortedDays = Object.keys(dailyData).sort();
+
+    if (sortedDays.length === 0) {
       return [];
     }
 
-    return days.map(day => {
+    const result = sortedDays.map((day) => {
       const controlsInDay = Object.values(dailyData[day]);
-      const passing = controlsInDay.filter(s => s === CheckStatus.PASS).length;
-      const score = controlsInDay.length > 0 ? (passing / controlsInDay.length) * 100 : 0;
-      
+      const passing = controlsInDay.filter(
+        (s) => s === CheckStatus.PASS,
+      ).length;
+      const score =
+        controlsInDay.length > 0 ? (passing / controlsInDay.length) * 100 : 0;
+
       return {
         name: new Date(day).toLocaleDateString('en-US', { weekday: 'short' }),
         score: Math.round(score),
       };
     });
+
+    // Cache for 15 minutes (compliance scores)
+    await this.cacheService.set(cacheKey, result, 900);
+    return result;
+  }
+
+  async invalidateCache(customerId: string) {
+    await this.cacheService.invalidatePattern(`*:${customerId}:*`);
   }
 }

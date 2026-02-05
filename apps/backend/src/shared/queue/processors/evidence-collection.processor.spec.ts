@@ -69,7 +69,9 @@ describe('EvidenceCollectionProcessor', () => {
       ],
     }).compile();
 
-    processor = module.get<EvidenceCollectionProcessor>(EvidenceCollectionProcessor);
+    processor = module.get<EvidenceCollectionProcessor>(
+      EvidenceCollectionProcessor,
+    );
     prisma = module.get<PrismaService>(PrismaService);
     awsService = module.get<AwsService>(AwsService);
     githubService = module.get<GitHubService>(GitHubService);
@@ -106,9 +108,15 @@ describe('EvidenceCollectionProcessor', () => {
         controlId: 'CC6.1',
         title: 'MFA',
       });
-      mockAwsService.collectIamEvidence.mockResolvedValue({ status: 'PASS', data: {} });
+      mockAwsService.collectIamEvidence.mockResolvedValue({
+        status: 'PASS',
+        data: {},
+      });
       mockPrismaService.evidence.findFirst.mockResolvedValue(null);
-      mockPrismaService.evidence.create.mockResolvedValue({ id: 'ev1', hash: 'abc' });
+      mockPrismaService.evidence.create.mockResolvedValue({
+        id: 'ev1',
+        hash: 'abc',
+      });
 
       const result = await processor.handleAwsCollection(mockJob);
 
@@ -119,7 +127,9 @@ describe('EvidenceCollectionProcessor', () => {
 
     it('should throw error if integration not found', async () => {
       mockPrismaService.integration.findUnique.mockResolvedValue(null);
-      await expect(processor.handleAwsCollection(mockJob)).rejects.toThrow('Integration int1 not found');
+      await expect(processor.handleAwsCollection(mockJob)).rejects.toThrow(
+        'Integration int1 not found',
+      );
     });
   });
 
@@ -144,8 +154,14 @@ describe('EvidenceCollectionProcessor', () => {
         id: 'ctrl2',
         controlId: 'CC7.2',
       });
-      mockGitHubService.collectBranchProtectionEvidence.mockResolvedValue({ status: 'PASS', data: {} });
-      mockPrismaService.evidence.create.mockResolvedValue({ id: 'ev2', hash: 'def' });
+      mockGitHubService.collectBranchProtectionEvidence.mockResolvedValue({
+        status: 'PASS',
+        data: {},
+      });
+      mockPrismaService.evidence.create.mockResolvedValue({
+        id: 'ev2',
+        hash: 'def',
+      });
 
       const result = await processor.handleGitHubCollection(mockJob);
 
@@ -175,8 +191,14 @@ describe('EvidenceCollectionProcessor', () => {
         id: 'ctrl3',
         controlId: 'CC6.1.3',
       });
-      mockOktaService.collectMfaEnforcementEvidence.mockResolvedValue({ status: 'PASS', data: {} });
-      mockPrismaService.evidence.create.mockResolvedValue({ id: 'ev3', hash: 'ghi' });
+      mockOktaService.collectMfaEnforcementEvidence.mockResolvedValue({
+        status: 'PASS',
+        data: {},
+      });
+      mockPrismaService.evidence.create.mockResolvedValue({
+        id: 'ev3',
+        hash: 'ghi',
+      });
 
       const result = await processor.handleOktaCollection(mockJob);
 

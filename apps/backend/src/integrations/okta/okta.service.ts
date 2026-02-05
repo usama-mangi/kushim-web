@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as okta from '@okta/okta-sdk-nodejs';
-import { retryWithBackoff, CircuitBreaker } from '../../common/utils/retry.util';
+import {
+  retryWithBackoff,
+  CircuitBreaker,
+} from '../../common/utils/retry.util';
 
 @Injectable()
 export class OktaService {
@@ -19,14 +22,18 @@ export class OktaService {
         token,
       });
     } else {
-      this.logger.warn('Okta default client not initialized: OKTA_DOMAIN or OKTA_API_TOKEN missing');
+      this.logger.warn(
+        'Okta default client not initialized: OKTA_DOMAIN or OKTA_API_TOKEN missing',
+      );
     }
   }
 
   private getClient(config?: { orgUrl: string; token: string }): okta.Client {
     if (config) {
       return new okta.Client({
-        orgUrl: config.orgUrl.startsWith('http') ? config.orgUrl : `https://${config.orgUrl}`,
+        orgUrl: config.orgUrl.startsWith('http')
+          ? config.orgUrl
+          : `https://${config.orgUrl}`,
         token: config.token,
       });
     }
@@ -39,7 +46,10 @@ export class OktaService {
   /**
    * Check connection validity
    */
-  async checkConnection(config?: { orgUrl: string; token: string }): Promise<boolean> {
+  async checkConnection(config?: {
+    orgUrl: string;
+    token: string;
+  }): Promise<boolean> {
     try {
       const client = this.getClient(config);
       await client.userApi.listUsers({ limit: 1 });
@@ -54,14 +64,17 @@ export class OktaService {
    * Collect MFA enforcement evidence
    * SOC 2 Control: CC6.1 (Logical Access Controls)
    */
-  async collectMfaEnforcementEvidence(config?: { orgUrl: string; token: string }) {
+  async collectMfaEnforcementEvidence(config?: {
+    orgUrl: string;
+    token: string;
+  }) {
     this.logger.log('Collecting Okta MFA enforcement evidence...');
     const client = this.getClient(config);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         const users: any[] = [];
-        
+
         // Collect all users
         const userCollection = await client.userApi.listUsers({});
         for await (const user of userCollection) {
@@ -75,7 +88,7 @@ export class OktaService {
               const factorCollection = await client.userFactorApi.listFactors({
                 userId: user.id,
               });
-              
+
               for await (const factor of factorCollection) {
                 factors.push(factor);
               }
@@ -113,7 +126,9 @@ export class OktaService {
         const activeUsers = userMfaStatus.filter((u) => u.status === 'ACTIVE');
         const activeUsersWithMfa = activeUsers.filter((u) => u.hasMfa);
         const mfaComplianceRate =
-          activeUsers.length > 0 ? activeUsersWithMfa.length / activeUsers.length : 0;
+          activeUsers.length > 0
+            ? activeUsersWithMfa.length / activeUsers.length
+            : 0;
 
         this.logger.log(
           `MFA enforcement evidence collected: ${activeUsersWithMfa.length}/${activeUsers.length} active users have MFA`,
@@ -126,7 +141,8 @@ export class OktaService {
             totalUsers: users.length,
             activeUsers: activeUsers.length,
             activeUsersWithMfa: activeUsersWithMfa.length,
-            activeUsersWithoutMfa: activeUsers.length - activeUsersWithMfa.length,
+            activeUsersWithoutMfa:
+              activeUsers.length - activeUsersWithMfa.length,
             mfaComplianceRate,
             users: userMfaStatus,
           },
@@ -147,22 +163,31 @@ export class OktaService {
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         const users: any[] = [];
-        
+
         const userCollection = await client.userApi.listUsers({});
         for await (const user of userCollection) {
           users.push(user);
         }
 
-        const usersByStatus = users.reduce((acc, user) => {
-          acc[user.status] = (acc[user.status] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
+        const usersByStatus = users.reduce(
+          (acc, user) => {
+            acc[user.status] = (acc[user.status] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>,
+        );
 
         const activeUsers = users.filter((u) => u.status === 'ACTIVE').length;
-        const suspendedUsers = users.filter((u) => u.status === 'SUSPENDED').length;
-        const deprovisionedUsers = users.filter((u) => u.status === 'DEPROVISIONED').length;
+        const suspendedUsers = users.filter(
+          (u) => u.status === 'SUSPENDED',
+        ).length;
+        const deprovisionedUsers = users.filter(
+          (u) => u.status === 'DEPROVISIONED',
+        ).length;
 
-        this.logger.log(`User access evidence collected: ${users.length} total users`);
+        this.logger.log(
+          `User access evidence collected: ${users.length} total users`,
+        );
 
         return {
           type: 'OKTA_USER_ACCESS',
@@ -184,19 +209,22 @@ export class OktaService {
    * Collect policy compliance evidence
    * SOC 2 Control: CC6.1 (Access Policies)
    */
-  async collectPolicyComplianceEvidence(config?: { orgUrl: string; token: string }) {
+  async collectPolicyComplianceEvidence(config?: {
+    orgUrl: string;
+    token: string;
+  }) {
     this.logger.log('Collecting Okta policy compliance evidence...');
     const client = this.getClient(config);
 
     return await this.circuitBreaker.execute(async () => {
       return await retryWithBackoff(async () => {
         const policies: any[] = [];
-        
+
         try {
           const policyCollection = await client.policyApi.listPolicies({
             type: 'PASSWORD',
           });
-          
+
           for await (const policy of policyCollection) {
             policies.push(policy);
           }
@@ -212,9 +240,13 @@ export class OktaService {
           priority: policy.priority,
         }));
 
-        const activePolicies = policies.filter((p) => p.status === 'ACTIVE').length;
+        const activePolicies = policies.filter(
+          (p) => p.status === 'ACTIVE',
+        ).length;
 
-        this.logger.log(`Policy compliance evidence collected: ${activePolicies} active policies`);
+        this.logger.log(
+          `Policy compliance evidence collected: ${activePolicies} active policies`,
+        );
 
         return {
           type: 'OKTA_POLICY_COMPLIANCE',
@@ -233,7 +265,10 @@ export class OktaService {
   /**
    * Calculate overall health score for Okta integration
    */
-  async calculateHealthScore(config?: { orgUrl: string; token: string }): Promise<number> {
+  async calculateHealthScore(config?: {
+    orgUrl: string;
+    token: string;
+  }): Promise<number> {
     try {
       const [mfaEnforcement, userAccess, policyCompliance] = await Promise.all([
         this.collectMfaEnforcementEvidence(config),
@@ -247,9 +282,12 @@ export class OktaService {
         policyCompliance.status === 'PASS' ? 1 : 0.5,
       ];
 
-      const healthScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      const healthScore =
+        scores.reduce((sum, score) => sum + score, 0) / scores.length;
 
-      this.logger.log(`Okta health score calculated: ${(healthScore * 100).toFixed(2)}%`);
+      this.logger.log(
+        `Okta health score calculated: ${(healthScore * 100).toFixed(2)}%`,
+      );
 
       return healthScore;
     } catch (error) {
@@ -268,4 +306,3 @@ export class OktaService {
     };
   }
 }
-

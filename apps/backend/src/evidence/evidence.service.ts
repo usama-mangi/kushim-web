@@ -39,16 +39,19 @@ export class EvidenceService {
     // Reconstruct hash payload
     // Note: detailed verification requires ensuring the timestamp matches exactly.
     // We assume the stored evidence has the collectedAt timestamp that was used for hashing.
-    
+
     const contentToHash = JSON.stringify({
       customerId: evidence.customerId,
       controlId: evidence.controlId,
       data: evidence.data,
       timestamp: evidence.collectedAt.toISOString(),
     });
-    
-    const calculatedHash = crypto.createHash('sha256').update(contentToHash).digest('hex');
-    
+
+    const calculatedHash = crypto
+      .createHash('sha256')
+      .update(contentToHash)
+      .digest('hex');
+
     return {
       verified: calculatedHash === evidence.hash,
       storedHash: evidence.hash,

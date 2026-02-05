@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './shared/prisma/prisma.module';
@@ -18,8 +20,8 @@ import { AuthModule } from './auth/auth.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { IntegrationsManagementModule } from './integrations/integrations.module';
-
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { CacheModule } from './common/cache/cache.module';
+import { AuditModule } from './audit/audit.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 @Module({
@@ -28,6 +30,19 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
       isGlobal: true,
       envFilePath: '../../.env',
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60000, // 60 seconds
+        limit: 100, // 100 requests per minute for general API
+      },
+      {
+        name: 'auth',
+        ttl: 60000, // 60 seconds
+        limit: 5, // 5 requests per minute for auth endpoints
+      },
+    ]),
+    CacheModule,
     PrismaModule,
     QueueModule,
     EvidenceCollectionQueueModule,
@@ -42,10 +57,15 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     EvidenceModule,
     ComplianceModule,
     IntegrationsManagementModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

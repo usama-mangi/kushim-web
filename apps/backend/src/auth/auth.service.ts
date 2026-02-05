@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../shared/prisma/prisma.service';
@@ -19,19 +23,22 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(user.password, foundUser.password);
+    const isPasswordValid = await bcrypt.compare(
+      user.password,
+      foundUser.password,
+    );
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const payload = { 
-      sub: foundUser.id, 
-      email: foundUser.email, 
+    const payload = {
+      sub: foundUser.id,
+      email: foundUser.email,
       role: foundUser.role,
-      customerId: foundUser.customerId 
+      customerId: foundUser.customerId,
     };
-    
+
     return {
       token: this.jwtService.sign(payload),
       user: {
@@ -75,11 +82,11 @@ export class AuthService {
       },
     });
 
-    const payload = { 
-      sub: newUser.id, 
-      email: newUser.email, 
+    const payload = {
+      sub: newUser.id,
+      email: newUser.email,
       role: newUser.role,
-      customerId: newUser.customerId 
+      customerId: newUser.customerId,
     };
 
     return {
@@ -123,9 +130,15 @@ export class AuthService {
       // For security, don't reveal if user exists, but we'll log it
       console.log(`Password reset requested for non-existent email: ${email}`);
     } else {
-      console.log(`Password reset requested for user: ${email}. In production, we would send an email here.`);
+      console.log(
+        `Password reset requested for user: ${email}. In production, we would send an email here.`,
+      );
     }
 
-    return { success: true, message: 'If an account exists with that email, a reset link has been sent.' };
+    return {
+      success: true,
+      message:
+        'If an account exists with that email, a reset link has been sent.',
+    };
   }
 }

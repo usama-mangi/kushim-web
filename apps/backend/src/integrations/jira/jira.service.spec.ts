@@ -56,8 +56,8 @@ describe('JiraService', () => {
         data: {
           id: '1001',
           key: 'PROJ-1',
-          self: 'http://test.atlassian.net/rest/api/3/issue/1001'
-        }
+          self: 'http://test.atlassian.net/rest/api/3/issue/1001',
+        },
       });
 
       const result = await service.createRemediationTicket({
@@ -65,17 +65,24 @@ describe('JiraService', () => {
         controlTitle: 'MFA',
         failureReason: 'User missing MFA',
         evidenceId: 'ev-1',
-        projectKey: 'PROJ'
+        projectKey: 'PROJ',
       });
 
       expect(result.status).toBe('SUCCESS');
       expect(result.data.issueKey).toBe('PROJ-1');
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/issue', expect.objectContaining({
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+        '/issue',
+        expect.objectContaining({
           fields: expect.objectContaining({
-              project: { key: 'PROJ' },
-              labels: expect.arrayContaining(['compliance', 'automated', 'CC6.1'])
-          })
-      }));
+            project: { key: 'PROJ' },
+            labels: expect.arrayContaining([
+              'compliance',
+              'automated',
+              'CC6.1',
+            ]),
+          }),
+        }),
+      );
     });
   });
 
@@ -83,12 +90,12 @@ describe('JiraService', () => {
     it('should update ticket status successfully', async () => {
       // Mock transitions response
       mockAxiosInstance.get.mockResolvedValue({
-          data: {
-              transitions: [
-                  { id: '21', name: 'In Progress' },
-                  { id: '31', name: 'Done' }
-              ]
-          }
+        data: {
+          transitions: [
+            { id: '21', name: 'In Progress' },
+            { id: '31', name: 'Done' },
+          ],
+        },
       });
       // Mock update response
       mockAxiosInstance.post.mockResolvedValue({});
@@ -97,43 +104,46 @@ describe('JiraService', () => {
 
       expect(result.status).toBe('SUCCESS');
       expect(result.data.newStatus).toBe('Done');
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/issue/PROJ-1/transitions', {
-          transition: { id: '31' }
-      });
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+        '/issue/PROJ-1/transitions',
+        {
+          transition: { id: '31' },
+        },
+      );
     });
 
     it('should throw error if transition not found', async () => {
-        mockAxiosInstance.get.mockResolvedValue({
-            data: {
-                transitions: [{ id: '21', name: 'In Progress' }]
-            }
-        });
-  
-        await expect(service.updateTicketStatus('PROJ-1', 'UnknownStatus'))
-          .rejects.toThrow('Transition to status "UnknownStatus" not found');
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          transitions: [{ id: '21', name: 'In Progress' }],
+        },
+      });
+
+      await expect(
+        service.updateTicketStatus('PROJ-1', 'UnknownStatus'),
+      ).rejects.toThrow('Transition to status "UnknownStatus" not found');
     });
   });
 
   describe('syncTicketStatus', () => {
-      it('should return ticket details', async () => {
-          mockAxiosInstance.get.mockResolvedValue({
-              data: {
-                  id: '1001',
-                  key: 'PROJ-1',
-                  fields: {
-                      summary: 'Test Issue',
-                      status: { name: 'Done' },
-                      assignee: { displayName: 'John Doe' }
-                  }
-              }
-          });
-
-          const result = await service.syncTicketStatus('PROJ-1');
-
-          expect(result.status).toBe('SUCCESS');
-          expect(result.data.status).toBe('Done');
-          expect(result.data.assignee).toBe('John Doe');
+    it('should return ticket details', async () => {
+      mockAxiosInstance.get.mockResolvedValue({
+        data: {
+          id: '1001',
+          key: 'PROJ-1',
+          fields: {
+            summary: 'Test Issue',
+            status: { name: 'Done' },
+            assignee: { displayName: 'John Doe' },
+          },
+        },
       });
-  });
 
+      const result = await service.syncTicketStatus('PROJ-1');
+
+      expect(result.status).toBe('SUCCESS');
+      expect(result.data.status).toBe('Done');
+      expect(result.data.assignee).toBe('John Doe');
+    });
+  });
 });

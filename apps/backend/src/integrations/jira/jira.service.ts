@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { type AxiosInstance } from 'axios';
-import { retryWithBackoff, CircuitBreaker } from '../../common/utils/retry.util';
+import {
+  retryWithBackoff,
+  CircuitBreaker,
+} from '../../common/utils/retry.util';
 
 interface JiraIssue {
   id: string;
@@ -41,7 +44,11 @@ export class JiraService {
     });
   }
 
-  private getClient(config?: { domain: string; email: string; apiToken: string }): { client: AxiosInstance; domain: string } {
+  private getClient(config?: {
+    domain: string;
+    email: string;
+    apiToken: string;
+  }): { client: AxiosInstance; domain: string } {
     if (!config) {
       return { client: this.defaultJiraClient, domain: this.defaultJiraDomain };
     }
@@ -63,7 +70,11 @@ export class JiraService {
   /**
    * Check connection validity
    */
-  async checkConnection(config?: { domain: string; email: string; apiToken: string }): Promise<boolean> {
+  async checkConnection(config?: {
+    domain: string;
+    email: string;
+    apiToken: string;
+  }): Promise<boolean> {
     try {
       const { client } = this.getClient(config);
       await client.get('/myself');
@@ -87,7 +98,9 @@ export class JiraService {
     projectKey: string;
     config?: { domain: string; email: string; apiToken: string };
   }) {
-    this.logger.log(`Creating Jira remediation ticket for control ${data.controlId}...`);
+    this.logger.log(
+      `Creating Jira remediation ticket for control ${data.controlId}...`,
+    );
     const { client, domain } = this.getClient(data.config);
 
     return await this.circuitBreaker.execute(async () => {
@@ -144,7 +157,9 @@ export class JiraService {
 
         const issue: JiraIssue = response.data;
 
-        this.logger.log(`Created Jira ticket ${issue.key} for control ${data.controlId}`);
+        this.logger.log(
+          `Created Jira ticket ${issue.key} for control ${data.controlId}`,
+        );
 
         return {
           type: 'JIRA_TICKET_CREATED',
@@ -164,7 +179,11 @@ export class JiraService {
   /**
    * Update an existing Jira ticket status
    */
-  async updateTicketStatus(issueKey: string, status: string, config?: { domain: string; email: string; apiToken: string }) {
+  async updateTicketStatus(
+    issueKey: string,
+    status: string,
+    config?: { domain: string; email: string; apiToken: string },
+  ) {
     this.logger.log(`Updating Jira ticket ${issueKey} status to ${status}...`);
     const { client } = this.getClient(config);
 
@@ -207,7 +226,10 @@ export class JiraService {
   /**
    * Sync ticket status from Jira
    */
-  async syncTicketStatus(issueKey: string, config?: { domain: string; email: string; apiToken: string }) {
+  async syncTicketStatus(
+    issueKey: string,
+    config?: { domain: string; email: string; apiToken: string },
+  ) {
     this.logger.log(`Syncing Jira ticket ${issueKey} status...`);
     const { client } = this.getClient(config);
 
@@ -216,7 +238,9 @@ export class JiraService {
         const response = await client.get(`/issue/${issueKey}`);
         const issue: JiraIssue = response.data;
 
-        this.logger.log(`Synced Jira ticket ${issueKey}: ${issue.fields.status.name}`);
+        this.logger.log(
+          `Synced Jira ticket ${issueKey}: ${issue.fields.status.name}`,
+        );
 
         return {
           type: 'JIRA_TICKET_SYNCED',
