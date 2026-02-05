@@ -19,6 +19,9 @@ import { EvidenceModule } from './evidence/evidence.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { IntegrationsManagementModule } from './integrations/integrations.module';
 
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -43,6 +46,10 @@ import { IntegrationsManagementModule } from './integrations/integrations.module
   controllers: [AppController],
   providers: [
     AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
+    },
   ],
 })
 export class AppModule {}

@@ -29,26 +29,36 @@ export class OAuthController {
     @Query('state') state: string,
     @Res() res: Response,
   ) {
+    console.log(`[OAuthController] Received callback for ${platform}`);
     if (!code || !state) {
+      console.error(`[OAuthController] Missing code or state for ${platform}`);
       throw new BadRequestException('Missing code or state');
     }
 
     try {
       // Decrypt state to get customerId
+      console.log(`[OAuthController] Decrypting state: ${state}`);
       const decryptedState = JSON.parse(decrypt(state));
       const { customerId } = decryptedState;
+      console.log(`[OAuthController] Decrypted customerId: ${customerId}`);
 
       if (!customerId) {
+        console.error(`[OAuthController] CustomerId missing in state for ${platform}`);
         throw new BadRequestException('Invalid state: customerId missing');
       }
 
-      await this.oauthService.exchangeToken(platform, code, customerId);
+      console.log(`[OAuthController] Exchanging token for ${platform}...`);
+      const result = await this.oauthService.exchangeToken(platform, code, customerId);
+      console.log(`[OAuthController] Token exchange successful for ${platform}. Result:`, result);
 
       // Redirect back to frontend
       const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
-      return res.redirect(`${frontendUrl}/integrations?success=true&platform=${platform}`);
+      const setupParam = (result as any)?.setupRequired ? '&setup_required=true' : '';
+      const redirectUrl = `${frontendUrl}/integrations?success=true&platform=${platform}${setupParam}`;
+      console.log(`[OAuthController] Redirecting to: ${redirectUrl}`);
+      return res.redirect(redirectUrl);
     } catch (error) {
-      console.error(`OAuth callback error for ${platform}:`, error);
+      console.error(`[OAuthController] FAILED for ${platform}:`, error);
       const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
       return res.redirect(`${frontendUrl}/integrations?error=oauth_failed&platform=${platform}`);
     }

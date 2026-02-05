@@ -73,12 +73,14 @@ export class IntegrationsService {
       }
     }
 
+    console.log(`[IntegrationsService] Connecting ${type} for customer ${customerId}`);
     // Find existing or create new
     const existing = await this.prisma.integration.findFirst({
         where: { customerId, type }
     });
 
     if (existing) {
+        console.log(`[IntegrationsService] Updating existing ${type} integration ${existing.id}`);
         return this.prisma.integration.update({
             where: { id: existing.id },
             data: {
@@ -89,14 +91,22 @@ export class IntegrationsService {
         });
     }
 
-    return this.prisma.integration.create({
-      data: {
-        customerId,
-        type,
-        config: encryptedConfig,
-        status: 'ACTIVE',
-      },
-    });
+    console.log(`[IntegrationsService] Creating new ${type} integration`);
+    try {
+      const result = await this.prisma.integration.create({
+        data: {
+          customerId,
+          type,
+          config: encryptedConfig,
+          status: 'ACTIVE',
+        },
+      });
+      console.log(`[IntegrationsService] Created integration: ${result.id}`);
+      return result;
+    } catch (err) {
+      console.error(`[IntegrationsService] FAILED to create integration:`, err);
+      throw err;
+    }
   }
   async getDecryptedConfig(customerId: string, type: IntegrationType): Promise<any> {
     const integration = await this.prisma.integration.findFirst({

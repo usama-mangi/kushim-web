@@ -113,10 +113,23 @@ export class OAuthService {
     const { access_token } = response.data;
     if (!access_token) throw new BadRequestException('Failed to exchange GitHub token');
 
-    return this.integrationsService.connect(customerId, IntegrationType.GITHUB, {
-      personalAccessToken: access_token, // OAuth tokens are used like PATs in our current octokit setup
+    // Fetch user info to get the owner name
+    const userRes = await axios.get('https://api.github.com/user', {
+      headers: { Authorization: `token ${access_token}` },
+    });
+
+    const owner = userRes.data.login;
+    console.log(`[OAuthService] Connecting GitHub for customer ${customerId}, owner: ${owner}`);
+
+    await this.integrationsService.connect(customerId, IntegrationType.GITHUB, {
+      personalAccessToken: access_token,
+      owner,
+      repos: [], // Start with empty repos, user will select later
       isOAuth: true,
     });
+
+    console.log(`[OAuthService] Successfully connected GitHub for ${customerId}`);
+    return { setupRequired: true };
   }
 
   private async exchangeSlackToken(code: string, customerId: string) {

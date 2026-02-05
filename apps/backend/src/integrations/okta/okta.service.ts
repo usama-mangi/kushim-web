@@ -10,18 +10,30 @@ export class OktaService {
   private defaultOktaClient: okta.Client;
 
   constructor(private configService: ConfigService) {
-    const orgUrl = this.configService.get('OKTA_DOMAIN', '');
-    const token = this.configService.get('OKTA_API_TOKEN', '');
+    const orgUrl = this.configService.get('OKTA_DOMAIN');
+    const token = this.configService.get('OKTA_API_TOKEN');
 
-    this.defaultOktaClient = new okta.Client({
-      orgUrl,
-      token,
-    });
+    if (orgUrl && token) {
+      this.defaultOktaClient = new okta.Client({
+        orgUrl: orgUrl.startsWith('http') ? orgUrl : `https://${orgUrl}`,
+        token,
+      });
+    } else {
+      this.logger.warn('Okta default client not initialized: OKTA_DOMAIN or OKTA_API_TOKEN missing');
+    }
   }
 
   private getClient(config?: { orgUrl: string; token: string }): okta.Client {
-    if (!config) return this.defaultOktaClient;
-    return new okta.Client(config);
+    if (config) {
+      return new okta.Client({
+        orgUrl: config.orgUrl.startsWith('http') ? config.orgUrl : `https://${config.orgUrl}`,
+        token: config.token,
+      });
+    }
+    if (!this.defaultOktaClient) {
+      throw new Error('Okta client not configured');
+    }
+    return this.defaultOktaClient;
   }
 
   /**

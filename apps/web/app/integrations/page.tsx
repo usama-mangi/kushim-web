@@ -16,6 +16,7 @@ import { GithubConnectionForm } from "@/components/integrations/GithubConnection
 import { OktaConnectionForm } from "@/components/integrations/OktaConnectionForm";
 import { JiraConnectionForm } from "@/components/integrations/JiraConnectionForm";
 import { SlackConnectionForm } from "@/components/integrations/SlackConnectionForm";
+import { GitHubRepoSelectionModal } from "@/components/integrations/GitHubRepoSelectionModal";
 import { disconnectIntegrationByType } from "@/lib/api/endpoints";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -23,23 +24,37 @@ import { toast } from "sonner";
 export default function IntegrationsPage() {
   const { integrationHealth, isLoading, fetchDashboardData } = useDashboardStore();
   const searchParams = useSearchParams();
+  const [isRepoModalOpen, setIsRepoModalOpen] = useState(false);
 
+  // Initial data fetch only on mount
   useEffect(() => {
     fetchDashboardData();
+  }, [fetchDashboardData]);
 
+  // Handle OAuth callback parameters separately
+  useEffect(() => {
     const success = searchParams.get("success");
     const error = searchParams.get("error");
     const platform = searchParams.get("platform");
+    const setupRequired = searchParams.get("setup_required");
 
     if (success === "true") {
-      toast.success(`Successfully connected ${platform}!`);
-      // Clear URL params
-      window.history.replaceState({}, "", "/integrations");
+      if (setupRequired === "true" && platform === "github") {
+        setIsRepoModalOpen(true);
+      } else {
+        toast.success(`Successfully connected ${platform}!`);
+        // Clear URL params without triggering full re-render/re-fetch
+        const url = new URL(window.location.href);
+        url.search = "";
+        window.history.replaceState({}, "", url.pathname);
+      }
     } else if (error) {
       toast.error(`Failed to connect ${platform || "service"}.`);
-      window.history.replaceState({}, "", "/integrations");
+      const url = new URL(window.location.href);
+      url.search = "";
+      window.history.replaceState({}, "", url.pathname);
     }
-  }, [fetchDashboardData, searchParams]);
+  }, [searchParams]);
 
   const providers = [
     {
@@ -129,6 +144,14 @@ export default function IntegrationsPage() {
           })}
         </div>
       )}
+      <GitHubRepoSelectionModal 
+        isOpen={isRepoModalOpen} 
+        onOpenChange={setIsRepoModalOpen}
+        onSuccess={() => {
+          fetchDashboardData();
+          window.history.replaceState({}, "", "/integrations");
+        }}
+      />
     </div>
   );
 }

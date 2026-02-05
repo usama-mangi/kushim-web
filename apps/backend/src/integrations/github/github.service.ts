@@ -18,7 +18,7 @@ export class GitHubService {
     if (!config) return null;
     return {
       owner: config.owner || config.organization,
-      repo: config.repo || 'kushim-web',
+      repos: config.repos || (config.repo ? [config.repo] : []),
       token: config.token || config.personalAccessToken,
     };
   }
@@ -26,6 +26,28 @@ export class GitHubService {
   private getOctokit(token?: string): Octokit {
     if (!token) return this.defaultOctokit;
     return new Octokit({ auth: token });
+  }
+
+  /**
+   * List user repositories for selection
+   */
+  async listUserRepos(config: any): Promise<string[]> {
+    try {
+      const clientConfig = this.getClientConfig(config);
+      const octokit = this.getOctokit(clientConfig?.token);
+      
+      this.logger.log(`Fetching repositories for ${clientConfig?.owner}`);
+      
+      const response = await octokit.repos.listForAuthenticatedUser({
+        sort: 'updated',
+        per_page: 100,
+      });
+
+      return response.data.map((r) => r.name);
+    } catch (error) {
+      this.logger.error('Failed to list GitHub repositories', error);
+      throw error;
+    }
   }
 
   /**
@@ -50,84 +72,61 @@ export class GitHubService {
   async collectBranchProtectionEvidence(config?: any) {
     const clientConfig = this.getClientConfig(config);
     const owner = clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
-    const repo = clientConfig?.repo || this.configService.get('GITHUB_REPO', '');
+    const repos = clientConfig?.repos || [];
     const token = clientConfig?.token;
 
-    this.logger.log(`Collecting branch protection evidence for ${owner}/${repo}...`);
+    this.logger.log(`Collecting branch protection evidence for ${owner} across ${repos.length} repos...`);
     const octokit = this.getOctokit(token);
+    const allReposResults: { repo: string; totalMain: number; protectedMain: number }[] = [];
 
-    return await this.circuitBreaker.execute(async () => {
-      return await retryWithBackoff(async () => {
-        const branches = await octokit.repos.listBranches({
-          owner,
+    for (const repo of repos) {
+      try {
+        const branches = await octokit.repos.listBranches({ owner, repo });
+        const status: { branchName: string; protected: boolean }[] = [];
+        for (const branch of branches.data) {
+          try {
+            const protection = await octokit.repos.getBranchProtection({
+              owner,
+              repo,
+              branch: branch.name,
+            });
+            status.push({ branchName: branch.name, protected: true });
+          } catch (e) {
+            status.push({ branchName: branch.name, protected: false });
+          }
+        }
+
+        const main = status.filter((b) => ['main', 'master', 'production'].includes(b.branchName));
+        const protectedMain = main.filter((b) => b.protected);
+        allReposResults.push({
           repo,
+          totalMain: main.length,
+          protectedMain: protectedMain.length,
         });
 
-        const branchProtectionStatus = await Promise.all(
-          branches.data.map(async (branch) => {
-            try {
-              const protection = await octokit.repos.getBranchProtection({
-                owner,
-                repo,
-                branch: branch.name,
-              });
+        // Small delay between repos to avoid burst rate limits
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        allReposResults.push({ repo, totalMain: 0, protectedMain: 0 });
+      }
+    }
 
-              return {
-                branchName: branch.name,
-                protected: true,
-                requiresReviews: protection.data.required_pull_request_reviews !== null,
-                requiredReviewers: protection.data.required_pull_request_reviews
-                  ?.required_approving_review_count || 0,
-                requiresSignedCommits: protection.data.required_signatures?.enabled || false,
-                enforceAdmins: protection.data.enforce_admins?.enabled || false,
-              };
-            } catch (error: any) {
-              // GitHub returns 404 if branch protection is not enabled
-              if (error.status !== 404) {
-                this.logger.debug(`Non-404 error fetching protection for ${branch.name}: ${error.message}`);
-              }
-              
-              return {
-                branchName: branch.name,
-                protected: false,
-                requiresReviews: false,
-                requiredReviewers: 0,
-                requiresSignedCommits: false,
-                enforceAdmins: false,
-              };
-            }
-          }),
-        );
+    const totalMainBranches = allReposResults.reduce((sum, r) => sum + r.totalMain, 0);
+    const protectedMainBranches = allReposResults.reduce((sum, r) => sum + r.protectedMain, 0);
+    const complianceRate = totalMainBranches > 0 ? protectedMainBranches / totalMainBranches : 1;
 
-        const mainBranches = branchProtectionStatus.filter((b) =>
-          ['main', 'master', 'production'].includes(b.branchName),
-        );
-        const protectedMainBranches = mainBranches.filter((b) => b.protected);
-
-        const complianceRate =
-          mainBranches.length > 0
-            ? protectedMainBranches.length / mainBranches.length
-            : 1;
-
-        this.logger.log(
-          `Branch protection evidence collected: ${protectedMainBranches.length}/${mainBranches.length} main branches protected`,
-        );
-
-        return {
-          type: 'BRANCH_PROTECTION',
-          timestamp: new Date(),
-          data: {
-            repository: `${owner}/${repo}`,
-            totalBranches: branches.data.length,
-            mainBranches: mainBranches.length,
-            protectedMainBranches: protectedMainBranches.length,
-            complianceRate,
-            branches: branchProtectionStatus,
-          },
-          status: complianceRate === 1 ? 'PASS' : 'FAIL',
-        };
-      });
-    });
+    return {
+      type: 'BRANCH_PROTECTION',
+      timestamp: new Date(),
+      data: {
+        owner,
+        totalRepos: repos.length,
+        totalMainBranches,
+        protectedMainBranches,
+        complianceRate,
+      },
+      status: complianceRate === 1 ? 'PASS' : 'FAIL',
+    };
   }
 
   /**
@@ -137,52 +136,40 @@ export class GitHubService {
   async collectCommitSigningEvidence(config?: any) {
     const clientConfig = this.getClientConfig(config);
     const owner = clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
-    const repo = clientConfig?.repo || this.configService.get('GITHUB_REPO', '');
+    const repos = clientConfig?.repos || [];
     const token = clientConfig?.token;
 
-    this.logger.log(`Collecting commit signing evidence for ${owner}/${repo}...`);
+    this.logger.log(`Collecting commit signing evidence for ${owner} across ${repos.length} repos...`);
     const octokit = this.getOctokit(token);
+    const allReposResults: { repo: string; total: number; verified: number }[] = [];
 
-    return await this.circuitBreaker.execute(async () => {
-      return await retryWithBackoff(async () => {
-        const commits = await octokit.repos.listCommits({
-          owner,
-          repo,
-          per_page: 100,
-        });
+    for (const repo of repos) {
+      try {
+        const commits = await octokit.repos.listCommits({ owner, repo, per_page: 20 });
+        const verified = commits.data.filter((c) => c.commit.verification?.verified).length;
+        allReposResults.push({ repo, total: commits.data.length, verified });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      } catch (e) {
+        allReposResults.push({ repo, total: 0, verified: 0 });
+      }
+    }
 
-        const commitSigningStatus = commits.data.map((commit) => ({
-          sha: commit.sha,
-          author: commit.commit.author?.name,
-          message: commit.commit.message.split('\n')[0],
-          verified: commit.commit.verification?.verified || false,
-          reason: commit.commit.verification?.reason,
-          date: commit.commit.author?.date,
-        }));
+    const totalCommits = allReposResults.reduce((sum, r) => sum + r.total, 0);
+    const signedCommits = allReposResults.reduce((sum, r) => sum + r.verified, 0);
+    const signingRate = totalCommits > 0 ? signedCommits / totalCommits : 0;
 
-        const totalCommits = commitSigningStatus.length;
-        const signedCommits = commitSigningStatus.filter((c) => c.verified).length;
-        const signingRate = totalCommits > 0 ? signedCommits / totalCommits : 0;
-
-        this.logger.log(
-          `Commit signing evidence collected: ${signedCommits}/${totalCommits} commits signed`,
-        );
-
-        return {
-          type: 'COMMIT_SIGNING',
-          timestamp: new Date(),
-          data: {
-            repository: `${owner}/${repo}`,
-            totalCommits,
-            signedCommits,
-            unsignedCommits: totalCommits - signedCommits,
-            signingRate,
-            recentCommits: commitSigningStatus.slice(0, 20),
-          },
-          status: signingRate >= 0.8 ? 'PASS' : 'WARNING', // 80% threshold
-        };
-      });
-    });
+    return {
+      type: 'COMMIT_SIGNING',
+      timestamp: new Date(),
+      data: {
+        owner,
+        totalRepos: repos.length,
+        totalCommits,
+        signedCommits,
+        signingRate,
+      },
+      status: signingRate >= 0.8 ? 'PASS' : 'WARNING',
+    };
   }
 
   /**
@@ -192,50 +179,51 @@ export class GitHubService {
   async collectSecurityEvidence(config?: any) {
     const clientConfig = this.getClientConfig(config);
     const owner = clientConfig?.owner || this.configService.get('GITHUB_OWNER', '');
-    const repo = clientConfig?.repo || this.configService.get('GITHUB_REPO', '');
+    const repos = clientConfig?.repos || [];
     const token = clientConfig?.token;
 
-    this.logger.log(`Collecting security evidence for ${owner}/${repo}...`);
+    this.logger.log(`Collecting security evidence for ${owner} across ${repos.length} repos...`);
     const octokit = this.getOctokit(token);
+    const allReposResults: { repo: string; score: number }[] = [];
 
-    return await this.circuitBreaker.execute(async () => {
-      return await retryWithBackoff(async () => {
+    for (const repo of repos) {
+      try {
         const [repository, vulnerabilityAlerts] = await Promise.all([
           octokit.repos.get({ owner, repo }),
-          octokit.repos.checkVulnerabilityAlerts({ owner, repo }).catch((err) => ({
-            status: err.status || 404,
-          })),
+          octokit.repos.checkVulnerabilityAlerts({ owner, repo }).catch(() => ({ status: 404 })),
         ]);
 
-        const hasVulnerabilityAlerts = vulnerabilityAlerts.status === 204;
-
         const securityFeatures = {
-          vulnerabilityAlertsEnabled: hasVulnerabilityAlerts,
+          vulnerabilityAlertsEnabled: vulnerabilityAlerts.status === 204,
           hasSecurityPolicy: (repository.data as any).security_and_analysis?.secret_scanning?.status === 'enabled',
-          dependabotEnabled: (repository.data as any).security_and_analysis?.dependabot_security_updates?.status === 'enabled',
           privateRepo: repository.data.private,
         };
 
-        const enabledFeatures = Object.values(securityFeatures).filter(Boolean).length;
-        const totalFeatures = Object.keys(securityFeatures).length;
-        const securityScore = enabledFeatures / totalFeatures;
+        allReposResults.push({
+          repo,
+          score: Object.values(securityFeatures).filter(Boolean).length / Object.keys(securityFeatures).length,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (e) {
+        allReposResults.push({ repo, score: 0 });
+      }
+    }
 
-        this.logger.log(
-          `Security evidence collected: ${enabledFeatures}/${totalFeatures} features enabled`,
-        );
+    const securityScore =
+      allReposResults.length > 0
+        ? allReposResults.reduce((sum, r) => sum + r.score, 0) / allReposResults.length
+        : 0;
 
-        return {
-          type: 'REPOSITORY_SECURITY',
-          timestamp: new Date(),
-          data: {
-            repository: `${owner}/${repo}`,
-            ...securityFeatures,
-            securityScore,
-          },
-          status: securityScore >= 0.75 ? 'PASS' : 'WARNING',
-        };
-      });
-    });
+    return {
+      type: 'REPOSITORY_SECURITY',
+      timestamp: new Date(),
+      data: {
+        owner,
+        totalRepos: repos.length,
+        securityScore,
+      },
+      status: securityScore >= 0.75 ? 'PASS' : 'WARNING',
+    };
   }
 
   /**
@@ -257,7 +245,7 @@ export class GitHubService {
 
       const healthScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
 
-      this.logger.log(`GitHub health score calculated: ${(healthScore * 100).toFixed(2)}%`);
+      this.logger.log(`GitHub health score calculated across all repos: ${(healthScore * 100).toFixed(2)}%`);
 
       return healthScore;
     } catch (error) {

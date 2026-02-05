@@ -35,15 +35,36 @@ import {
   AlertTriangle, 
   Search,
   Filter,
-  Eye
+  Eye,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 import { formatDate, getStatusBgColor } from "@/lib/utils";
+import { triggerComplianceScan } from "@/lib/api/endpoints";
+import { toast } from "sonner";
 import type { Control, IntegrationStatus } from "@/lib/api/types";
 
 export function ControlStatus() {
   const { controls, isLoading, fetchDashboardData } = useDashboardStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<IntegrationStatus | "ALL">("ALL");
+  const [isScanning, setIsScanning] = useState(false);
+
+  const handleScan = async () => {
+    setIsScanning(true);
+    try {
+      await triggerComplianceScan();
+      toast.success("Compliance scan started");
+      // Poll or wait a bit before refreshing
+      setTimeout(() => {
+        fetchDashboardData();
+      }, 2000);
+    } catch (error) {
+      toast.error("Failed to start compliance scan");
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   useEffect(() => {
     if (controls.length === 0) {
@@ -82,6 +103,19 @@ export function ControlStatus() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto">
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleScan} 
+                disabled={isScanning || isLoading}
+            >
+                {isScanning ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Scan Now
+            </Button>
             <div className="relative w-full md:w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input

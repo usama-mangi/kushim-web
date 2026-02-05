@@ -182,19 +182,26 @@ export class IntegrationReliabilityService {
    */
   private async checkGitHubHealth(customerId: string): Promise<IntegrationHealth | null> {
     try {
+      console.log(`[ReliabilityService] Checking GitHub health for customer: ${customerId}`);
       const integration = await this.prisma.integration.findFirst({
         where: { customerId, type: IntegrationType.GITHUB }
       });
 
       if (!integration) {
+        console.log(`[ReliabilityService] No GitHub integration found for customer: ${customerId}`);
         return null;
       }
 
+      console.log(`[ReliabilityService] Found GitHub integration for ${customerId}. Config:`, { 
+        ...(integration.config as any), 
+        token: '***' // Hide token
+      });
       const config = this.decryptConfig(integration.config);
       const circuitBreaker = this.githubService.getCircuitBreakerStatus();
       
       const healthScore = await this.githubService.calculateHealthScore(config);
       const status = this.determineStatus(healthScore, circuitBreaker.failureCount);
+      console.log(`[ReliabilityService] GitHub health score: ${healthScore}, Status: ${status}`);
 
       return {
         integration: 'github',

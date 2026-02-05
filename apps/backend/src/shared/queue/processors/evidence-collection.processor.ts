@@ -152,9 +152,21 @@ export class EvidenceCollectionProcessor {
       let evidenceData: any;
       const config = this.decryptConfig(integration.config);
 
-      if (control.controlId === 'CC7.2') {
+      switch (control.controlId) {
+        case 'CC7.1.1': // IaC repos monitoring
+        case 'CC8.1.2': // Branch protection / Peer review
           evidenceData = await this.githubService.collectBranchProtectionEvidence(config);
-      } else {
+          break;
+        case 'CC8.1.3': // CI/CD / Commit signing
+          evidenceData = await this.githubService.collectCommitSigningEvidence(config);
+          break;
+        case 'CC7.2':
+        case 'CC7.2.1': // SAST
+        case 'CC7.2.2': // Dependabot
+          evidenceData = await this.githubService.collectSecurityEvidence(config);
+          break;
+        default:
+          this.logger.warn(`Unknown mapping for control ${control.controlId} in GitHub, defaulting to Branch Protection`);
           evidenceData = await this.githubService.collectBranchProtectionEvidence(config);
       }
 

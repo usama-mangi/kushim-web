@@ -125,13 +125,7 @@ function IntegrationCard({ name, integration, icon, isLoading }: IntegrationCard
 }
 
 export function IntegrationHealth() {
-  const { integrationHealth, isLoading, fetchDashboardData } = useDashboardStore();
-
-  useEffect(() => {
-    if (!integrationHealth.aws) {
-      fetchDashboardData();
-    }
-  }, [integrationHealth, fetchDashboardData]);
+  const { integrationHealth, isLoading } = useDashboardStore();
 
   const integrations = [
     {

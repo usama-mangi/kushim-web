@@ -52,6 +52,10 @@ export async function getComplianceTrends(): Promise<any[]> {
   return apiClient.get<any[]>("/compliance/trends");
 }
 
+export async function triggerComplianceScan(): Promise<{ success: boolean; message: string }> {
+  return apiClient.post<{ success: boolean; message: string }>("/compliance/scan");
+}
+
 // ============================================================================
 // Reliability / Overall Health
 // ============================================================================
@@ -104,6 +108,14 @@ export async function collectGithubCommitSigningEvidence(): Promise<EvidenceData
 
 export async function collectGithubSecurityEvidence(): Promise<EvidenceData> {
   return apiClient.post<EvidenceData>("/integrations/github/evidence/security");
+}
+
+export async function getGithubRepos(): Promise<string[]> {
+  return apiClient.get<string[]>("/integrations/github/repos");
+}
+
+export async function completeGithubSetup(repos: string[]): Promise<any> {
+  return apiClient.post("/integrations/github/setup", { repos });
 }
 
 // ============================================================================

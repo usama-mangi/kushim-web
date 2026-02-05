@@ -3,8 +3,13 @@ import { GitHubService } from './github.service';
 import { GitHubController } from './github.controller';
 import { IntegrationsManagementModule } from '../integrations.module';
 
+import { ComplianceCheckQueueModule } from '../../shared/queue/queues.module';
+
 @Module({
-  imports: [forwardRef(() => IntegrationsManagementModule)],
+  imports: [
+    forwardRef(() => IntegrationsManagementModule),
+    ComplianceCheckQueueModule,
+  ],
   providers: [GitHubService],
   controllers: [GitHubController],
   exports: [GitHubService],
