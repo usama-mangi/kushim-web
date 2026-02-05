@@ -164,6 +164,7 @@ model Control {
 
   complianceChecks ComplianceCheck[]
   evidence         Evidence[]
+  evidenceMappings EvidenceMapping[]
 
   @@unique([framework, controlId])
   @@index([framework])
@@ -204,6 +205,7 @@ model Evidence {
   control          Control           @relation(fields: [controlId], references: [id])
   integration      Integration       @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   complianceChecks ComplianceCheck[]
+  evidenceMappings EvidenceMapping[]
 
   @@index([customerId])
   @@index([controlId])
@@ -295,4 +297,69 @@ enum AuditSeverity {
   WARNING
   ERROR
   CRITICAL
+}
+
+model EvidenceMapping {
+  id                String   @id @default(uuid())
+  evidenceId        String   @map("evidence_id")
+  controlId         String   @map("control_id")
+  confidence        Decimal  @db.Decimal(3, 2) // 0.00 to 1.00
+  aiReasoning       String   @db.Text @map("ai_reasoning")
+  isManualOverride  Boolean  @default(false) @map("is_manual_override")
+  manuallyVerified  Boolean  @default(false) @map("manually_verified")
+  createdBy         String?  @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  control  Control  @relation(fields: [controlId], references: [id], onDelete: Cascade)
+
+  @@unique([evidenceId, controlId])
+  @@index([evidenceId])
+  @@index([controlId])
+  @@index([confidence])
+  @@index([isManualOverride])
+  @@index([manuallyVerified])
+  @@map("evidence_mappings")
+}
+
+model AIPromptTemplate {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?  @db.Text
+  template    String   @db.Text
+  variables   Json // List of required variables
+  isActive    Boolean  @default(true) @map("is_active")
+  version     Int      @default(1)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  usageLogs AIUsageLog[]
+
+  @@index([name])
+  @@index([isActive])
+  @@map("ai_prompt_templates")
+}
+
+model AIUsageLog {
+  id                 String   @id @default(uuid())
+  customerId         String   @map("customer_id")
+  promptTemplateId   String?  @map("prompt_template_id")
+  model              String
+  promptTokens       Int      @map("prompt_tokens")
+  completionTokens   Int      @map("completion_tokens")
+  totalTokens        Int      @map("total_tokens")
+  estimatedCostUsd   Decimal  @db.Decimal(10, 6) @map("estimated_cost_usd")
+  operation          String // e.g., "evidence_mapping", "control_recommendation"
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  promptTemplate AIPromptTemplate? @relation(fields: [promptTemplateId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([operation])
+  @@index([createdAt])
+  @@index([customerId, operation])
+  @@index([customerId, createdAt])
+  @@map("ai_usage_logs")
 }

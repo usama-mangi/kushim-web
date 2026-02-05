@@ -30,6 +30,7 @@
     "@aws-sdk/client-config-service": "*",
     "@aws-sdk/client-iam": "*",
     "@aws-sdk/client-s3": "*",
+    "@langchain/openai": "^1.2.4",
     "@nestjs/bull": "*",
     "@nestjs/common": "*",
     "@nestjs/config": "*",
@@ -63,7 +64,9 @@
     "ioredis": "*",
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
+    "langchain": "^1.2.17",
     "nodemailer": "^8.0.0",
+    "openai": "^6.18.0",
     "p-queue": "*",
     "p-retry": "*",
     "passport-jwt": "^4.0.1",
@@ -74,7 +77,7 @@
     "uuid": "^11.1.0",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
-    "zod": "*"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "*",

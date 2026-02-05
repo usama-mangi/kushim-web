@@ -28,6 +28,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { LoggerModule } from './common/logger/logger.module';
 import { MetricsModule } from './common/metrics/metrics.module';
 import { MonitoringModule } from './common/monitoring/monitoring.module';
+import { AIModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { MonitoringModule } from './common/monitoring/monitoring.module';
     ComplianceModule,
     IntegrationsManagementModule,
     AuditModule,
+    AIModule,
   ],
   controllers: [AppController],
   providers: [
