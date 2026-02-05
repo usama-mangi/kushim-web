@@ -6,11 +6,12 @@ import { UsageTrackerService } from './usage-tracker.service';
 import { EvidenceMappingService } from './evidence-mapping/evidence-mapping.service';
 import { EvidenceMappingController } from './evidence-mapping/evidence-mapping.controller';
 import { PolicyDraftingModule } from './policy-drafting/policy-drafting.module';
+import { CopilotModule } from './copilot/copilot.module';
 import { PrismaService } from '../shared/prisma/prisma.service';
 import { CacheService } from '../common/cache/cache.service';
 
 @Module({
-  imports: [ConfigModule, PolicyDraftingModule],
+  imports: [ConfigModule, PolicyDraftingModule, CopilotModule],
   providers: [
     PrismaService,
     CacheService,
@@ -26,6 +27,7 @@ import { CacheService } from '../common/cache/cache.service';
     UsageTrackerService,
     EvidenceMappingService,
     PolicyDraftingModule,
+    CopilotModule,
   ],
 })
 export class AIModule {}
