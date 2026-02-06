@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { Loader2 } from "lucide-react";
 
-const publicRoutes = ["/login", "/register", "/forgot-password"];
+const publicRoutes = ["/", "/login", "/register", "/forgot-password"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isChecking && !isLoading) {
       if (!isAuthenticated && !publicRoutes.includes(pathname)) {
         router.push(`/login?redirect=${pathname}`);
-      } else if (isAuthenticated && pathname === "/login") {
+      } else if (isAuthenticated && (pathname === "/login" || pathname === "/")) {
         router.push("/dashboard");
       }
     }

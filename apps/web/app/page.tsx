@@ -1,11 +1,6 @@
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAuthStore } from "@/store/auth";
 import { 
   ShieldCheck, 
   Zap, 
@@ -24,15 +19,6 @@ import {
 } from "lucide-react";
 
 export default function LandingPage() {
-  const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
-
-  // Redirect to dashboard if already logged in
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push("/dashboard");
-    }
-  }, [isAuthenticated, router]);
   return (
     <main className="flex-1">
       {/* Hero Section - Editorial Article Style */}
