@@ -3,24 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
-import { Button } from "@/components/ui/button";
+import { UserDropdown } from "@/components/layout/UserDropdown";
+import { MobileNav } from "@/components/layout/MobileNav";
 import { 
   LayoutDashboard, 
   ShieldCheck, 
   FileText, 
-  Settings, 
-  LogOut,
-  User as UserIcon,
   Sparkles,
   Shield,
   BookOpen,
-  FileSearch
+  FileSearch,
+  Settings as SettingsIcon,
+  Command
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user, logout, isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   if (!isAuthenticated) return null;
 
@@ -32,54 +32,54 @@ export function Navbar() {
     { name: "Policies", href: "/policies", icon: BookOpen },
     { name: "Reports", href: "/reports", icon: FileText },
     { name: "Audit Logs", href: "/audit", icon: FileSearch },
-    { name: "Integrations", href: "/integrations", icon: Settings },
+    { name: "Integrations", href: "/integrations", icon: SettingsIcon },
   ];
 
   return (
     <nav className="border-b bg-card sticky top-0 z-50">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="container mx-auto px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2 font-bold text-xl text-primary">
-            <ShieldCheck className="h-6 w-6" />
-            <span>Kushim</span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <MobileNav isAuthenticated={isAuthenticated} />
+            <Link href="/" className="flex items-center gap-2 font-bold text-lg font-mono">
+              <ShieldCheck className="h-5 w-5" />
+              <span>Kushim</span>
+            </Link>
+          </div>
           
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-0.5">
             {navItems.map((item) => (
               <Link 
                 key={item.href} 
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors border-b-2 -mb-[1px]",
                   pathname === item.href 
-                    ? "bg-primary/10 text-primary" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "border-foreground text-foreground" 
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
                 )}
               >
-                <item.icon className="h-4 w-4" />
-                {item.name}
+                <item.icon className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">{item.name}</span>
               </Link>
             ))}
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Link href="/settings">
-            <Button variant="ghost" size="icon" className="mr-2">
-              <Settings className="h-4 w-4" />
-            </Button>
-          </Link>
-          
-          <div className="hidden sm:flex items-center gap-2 text-sm mr-4">
-            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-              {user?.firstName?.charAt(0) || "U"}
-            </div>
-            <span className="font-medium">{user?.firstName} {user?.lastName}</span>
-          </div>
-          
-          <Button variant="ghost" size="icon" onClick={() => logout()}>
-            <LogOut className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-3">
+          {/* Command palette hint */}
+          <button 
+            onClick={() => {
+              const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true });
+              document.dispatchEvent(event);
+            }}
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground border hover:bg-muted transition-colors"
+          >
+            <Command className="h-3.5 w-3.5" />
+            <span className="text-xs">Search</span>
+            <kbd className="ml-2 text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">⌘K</kbd>
+          </button>
+          <UserDropdown />
         </div>
       </div>
     </nav>
