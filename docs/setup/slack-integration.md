@@ -234,7 +234,7 @@ nano .env
 
 ```env
 # Slack OAuth Integration
-SLACK_BOT_TOKEN="xoxb-YOUR-BOT-TOKEN-WILL-APPEAR-HERE"
+SLACK_BOT_TOKEN="xoxb-YOUR-BOT-TOKEN-HERE"
 SLACK_SIGNING_SECRET="your-signing-secret-here" # From Basic Information page
 SLACK_CLIENT_ID="your.client.id"
 SLACK_CLIENT_SECRET="your-client-secret-here"
