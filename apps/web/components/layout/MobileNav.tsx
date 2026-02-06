@@ -30,7 +30,7 @@ export function MobileNav({ isAuthenticated }: MobileNavProps) {
   if (!isAuthenticated) return null;
 
   const navItems = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "AI Features", href: "/ai", icon: Sparkles },
     { name: "Frameworks", href: "/frameworks", icon: Shield },
     { name: "Controls", href: "/controls", icon: ShieldCheck },

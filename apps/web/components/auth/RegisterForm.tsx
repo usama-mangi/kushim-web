@@ -55,7 +55,7 @@ export function RegisterForm() {
         firstName: values.firstName,
         lastName: values.lastName,
       });
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       console.error("Registration failed", err);
     }

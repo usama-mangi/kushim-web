@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/auth";
 import { UserDropdown } from "@/components/layout/UserDropdown";
 import { MobileNav } from "@/components/layout/MobileNav";
+import { Button } from "@/components/ui/button";
 import { 
   LayoutDashboard, 
   ShieldCheck, 
@@ -22,10 +23,37 @@ export function Navbar() {
   const pathname = usePathname();
   const { isAuthenticated } = useAuthStore();
 
+  // Public navbar for landing page
+  if (!isAuthenticated && pathname === "/") {
+    return (
+      <nav className="border-b bg-card sticky top-0 z-50">
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 font-bold text-lg font-mono">
+            <ShieldCheck className="h-5 w-5" />
+            <span>Kushim</span>
+          </Link>
+          
+          <div className="flex items-center gap-3">
+            <Link href="/login">
+              <Button variant="ghost" size="sm" className="rounded-none">
+                Log In
+              </Button>
+            </Link>
+            <Link href="/register">
+              <Button size="sm" className="rounded-none">
+                Sign Up
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+
   if (!isAuthenticated) return null;
 
   const navItems = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "AI Features", href: "/ai", icon: Sparkles },
     { name: "Frameworks", href: "/frameworks", icon: Shield },
     { name: "Controls", href: "/controls", icon: ShieldCheck },
@@ -41,7 +69,7 @@ export function Navbar() {
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3">
             <MobileNav isAuthenticated={isAuthenticated} />
-            <Link href="/" className="flex items-center gap-2 font-bold text-lg font-mono">
+            <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg font-mono">
               <ShieldCheck className="h-5 w-5" />
               <span>Kushim</span>
             </Link>

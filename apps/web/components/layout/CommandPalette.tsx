@@ -84,7 +84,7 @@ export function CommandPalette() {
   }, [router, recentPages]);
 
   const navigationItems: CommandItem[] = [
-    { id: "dashboard", name: "Dashboard", icon: LayoutDashboard, href: "/", group: "Navigation", keywords: ["home", "overview"] },
+    { id: "dashboard", name: "Dashboard", icon: LayoutDashboard, href: "/dashboard", group: "Navigation", keywords: ["home", "overview"] },
     { id: "ai", name: "AI Features", icon: Sparkles, href: "/ai", group: "Navigation", keywords: ["copilot", "assistant"] },
     { id: "frameworks", name: "Frameworks", icon: Shield, href: "/frameworks", group: "Navigation", keywords: ["soc2", "iso", "hipaa"] },
     { id: "controls", name: "Controls", icon: ShieldCheck, href: "/controls", group: "Navigation", keywords: ["compliance", "check"] },
@@ -104,7 +104,7 @@ export function CommandPalette() {
   const actionItems: CommandItem[] = [
     { id: "generate-report", name: "Generate Report", icon: FileText, href: "/reports/generate", group: "Actions", keywords: ["create", "export"] },
     { id: "run-check", name: "Run Compliance Check", icon: Zap, href: "/controls", group: "Actions", keywords: ["scan", "verify"] },
-    { id: "view-alerts", name: "View Active Alerts", icon: AlertCircle, href: "/", group: "Actions", keywords: ["warnings", "issues"] },
+    { id: "view-alerts", name: "View Active Alerts", icon: AlertCircle, href: "/dashboard", group: "Actions", keywords: ["warnings", "issues"] },
   ];
 
   const settingsItems: CommandItem[] = [

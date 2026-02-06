@@ -30,7 +30,7 @@ export function LoginForm() {
   const { login, isLoading, error } = useAuthStore();
   const [internalError, setInternalError] = useState<string | null>(null);
 
-  const redirectUrl = searchParams.get("redirect") || "/";
+  const redirectUrl = searchParams.get("redirect") || "/dashboard";
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
