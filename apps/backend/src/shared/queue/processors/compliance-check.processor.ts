@@ -206,6 +206,15 @@ export class ComplianceCheckProcessor {
 
       const frameworkIds = customerFrameworks.map(cf => cf.frameworkId);
 
+      // Get customer's active integrations
+      const activeIntegrations = await this.prisma.integration.findMany({
+        where: { customerId, status: 'ACTIVE' },
+        select: { type: true },
+      });
+
+      const activeIntegrationTypes = new Set(activeIntegrations.map(i => i.type));
+      this.logger.log(`Customer has active integrations: ${Array.from(activeIntegrationTypes).join(', ')}`);
+
       // Fetch controls for customer's frameworks
       const controls = await this.prisma.control.findMany({
         where: {
@@ -216,7 +225,16 @@ export class ComplianceCheckProcessor {
       this.logger.log(`Found ${controls.length} controls for customer ${customerId}`);
 
       let scheduledCount = 0;
+      let skippedCount = 0;
+      
       for (const control of controls) {
+        // Skip controls that require integrations the customer doesn't have
+        if (control.integrationType && !activeIntegrationTypes.has(control.integrationType)) {
+          skippedCount++;
+          this.logger.debug(`Skipping control ${control.controlId} - requires ${control.integrationType} integration`);
+          continue;
+        }
+
         // Check if we need to run a check (e.g., based on last check)
         const lastCheck = await this.prisma.complianceCheck.findFirst({
           where: { customerId, controlId: control.id },
@@ -237,8 +255,8 @@ export class ComplianceCheckProcessor {
         }
       }
 
-      this.logger.log(`Scheduled ${scheduledCount} compliance checks for customer ${customerId}`);
-      return { success: true, jobId: job.id, scheduledCount };
+      this.logger.log(`Scheduled ${scheduledCount} compliance checks for customer ${customerId} (skipped ${skippedCount} due to missing integrations)`);
+      return { success: true, jobId: job.id, scheduledCount, skippedCount };
     } catch (error) {
       this.logger.error(`Failed to schedule checks for job ${job.id}:`, error);
       throw error;
