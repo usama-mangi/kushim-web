@@ -336,7 +336,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             <Link href="#contact">
-              <Button size="lg" variant="outline" className="h-14 px-8 rounded-none text-base border-background/20 text-background hover:bg-background/10">
+              <Button size="lg" variant="outline" className="h-14 px-8 rounded-none text-base bg-foreground border-background/20 text-background hover:text-background hover:bg-background/10">
                 Schedule Demo
               </Button>
             </Link>

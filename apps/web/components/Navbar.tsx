@@ -10,7 +10,6 @@ import {
   LayoutDashboard, 
   ShieldCheck, 
   FileText, 
-  Sparkles,
   Shield,
   BookOpen,
   FileSearch,
@@ -54,7 +53,6 @@ export function Navbar() {
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "AI Features", href: "/ai", icon: Sparkles },
     { name: "Frameworks", href: "/frameworks", icon: Shield },
     { name: "Controls", href: "/controls", icon: ShieldCheck },
     { name: "Policies", href: "/policies", icon: BookOpen },

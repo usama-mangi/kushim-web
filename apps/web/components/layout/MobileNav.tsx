@@ -11,7 +11,6 @@ import {
   ShieldCheck, 
   FileText, 
   Settings, 
-  Sparkles,
   Shield,
   BookOpen,
   FileSearch,
@@ -31,7 +30,6 @@ export function MobileNav({ isAuthenticated }: MobileNavProps) {
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "AI Features", href: "/ai", icon: Sparkles },
     { name: "Frameworks", href: "/frameworks", icon: Shield },
     { name: "Controls", href: "/controls", icon: ShieldCheck },
     { name: "Policies", href: "/policies", icon: BookOpen },
@@ -90,7 +88,7 @@ export function MobileNav({ isAuthenticated }: MobileNavProps) {
             <ExternalLink className="h-3.5 w-3.5" />
           </Link>
           <Link 
-            href="/settings"
+            href="/settings/profile"
             onClick={() => setOpen(false)}
             className="flex items-center justify-between px-3 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
           >

@@ -31,8 +31,10 @@ import {
   Search,
   Zap,
   AlertCircle,
+  Link as LinkIcon,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth";
+import { useAIStore } from "@/store/ai";
 
 interface CommandItem {
   id: string;
@@ -60,6 +62,7 @@ export function CommandPalette() {
   const [recentPages, setRecentPages] = useState<string[]>(getInitialRecentPages);
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
+  const { toggleCopilot, setEvidenceMappingOpen, setPolicyDraftingOpen } = useAIStore();
 
   // Keyboard shortcut to open
   useEffect(() => {
@@ -85,7 +88,6 @@ export function CommandPalette() {
 
   const navigationItems: CommandItem[] = [
     { id: "dashboard", name: "Dashboard", icon: LayoutDashboard, href: "/dashboard", group: "Navigation", keywords: ["home", "overview"] },
-    { id: "ai", name: "AI Features", icon: Sparkles, href: "/ai", group: "Navigation", keywords: ["copilot", "assistant"] },
     { id: "frameworks", name: "Frameworks", icon: Shield, href: "/frameworks", group: "Navigation", keywords: ["soc2", "iso", "hipaa"] },
     { id: "controls", name: "Controls", icon: ShieldCheck, href: "/controls", group: "Navigation", keywords: ["compliance", "check"] },
     { id: "policies", name: "Policies", icon: BookOpen, href: "/policies", group: "Navigation", keywords: ["document", "policy"] },
@@ -107,14 +109,22 @@ export function CommandPalette() {
     { id: "view-alerts", name: "View Active Alerts", icon: AlertCircle, href: "/dashboard", group: "Actions", keywords: ["warnings", "issues"] },
   ];
 
+  const aiItems: CommandItem[] = [
+    { id: "copilot", name: "Open Copilot", icon: Sparkles, group: "AI Tools", keywords: ["chat", "assistant", "ai"], action: () => { toggleCopilot(); setOpen(false); } },
+    { id: "evidence-mapping", name: "Evidence Mapping", icon: LinkIcon, group: "AI Tools", keywords: ["map", "controls", "ai"], action: () => { setEvidenceMappingOpen(true); setOpen(false); } },
+    { id: "policy-drafting", name: "Policy Drafting", icon: FileText, group: "AI Tools", keywords: ["generate", "policy", "ai"], action: () => { setPolicyDraftingOpen(true); setOpen(false); } },
+  ];
+
   const settingsItems: CommandItem[] = [
-    { id: "profile", name: "Profile Settings", icon: Users, href: "/settings", group: "Settings", keywords: ["account", "user"] },
-    { id: "api-keys", name: "API Keys", icon: Key, href: "/settings", group: "Settings", keywords: ["token", "credentials"] },
-    { id: "notifications", name: "Notification Settings", icon: Bell, href: "/settings", group: "Settings", keywords: ["email", "alerts"] },
+    { id: "profile", name: "Profile Settings", icon: Users, href: "/settings/profile", group: "Settings", keywords: ["account", "user"] },
+    { id: "company", name: "Company Settings", icon: Settings, href: "/settings/company", group: "Settings", keywords: ["organization", "business"] },
+    { id: "team", name: "Team Settings", icon: Users, href: "/settings/team", group: "Settings", keywords: ["members", "invite"] },
+    { id: "api-keys", name: "API Keys", icon: Key, href: "/settings/api", group: "Settings", keywords: ["token", "credentials"] },
+    { id: "notifications", name: "Notification Settings", icon: Bell, href: "/settings/notifications", group: "Settings", keywords: ["email", "alerts"] },
     { id: "help", name: "Help & Support", icon: HelpCircle, group: "Settings", keywords: ["docs", "support"], action: () => window.open("https://docs.kushim.dev", "_blank") },
   ];
 
-  const allItems = [...navigationItems, ...integrationItems, ...actionItems, ...settingsItems];
+  const allItems = [...navigationItems, ...integrationItems, ...actionItems, ...aiItems, ...settingsItems];
 
   const recentItems = recentPages
     .map(href => allItems.find(item => item.href === href))
@@ -195,6 +205,22 @@ export function CommandPalette() {
                 key={item.id}
                 value={`${item.name} ${item.keywords?.join(" ") || ""}`}
                 onSelect={() => item.href ? navigateTo(item.href) : item.action?.()}
+                className="cursor-pointer"
+              >
+                <item.icon className="mr-2 h-4 w-4" />
+                <span>{item.name}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          
+          <CommandSeparator />
+          
+          <CommandGroup heading="AI Tools">
+            {aiItems.map((item) => (
+              <CommandItem
+                key={item.id}
+                value={`${item.name} ${item.keywords?.join(" ") || ""}`}
+                onSelect={() => item.action?.()}
                 className="cursor-pointer"
               >
                 <item.icon className="mr-2 h-4 w-4" />

@@ -64,17 +64,17 @@ export function UserDropdown() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer">
+        <DropdownMenuItem onClick={() => router.push("/settings/profile")} className="cursor-pointer">
           <User className="mr-2 h-4 w-4" />
           Profile
           <DropdownMenuShortcut>⌘P</DropdownMenuShortcut>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer">
+        <DropdownMenuItem onClick={() => router.push("/settings/company")} className="cursor-pointer">
           <Settings className="mr-2 h-4 w-4" />
           Settings
           <DropdownMenuShortcut>S</DropdownMenuShortcut>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer">
+        <DropdownMenuItem onClick={() => router.push("/settings/team")} className="cursor-pointer">
           <Users className="mr-2 h-4 w-4" />
           Team
         </DropdownMenuItem>

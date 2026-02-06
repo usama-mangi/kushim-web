@@ -8,6 +8,7 @@ import { SentryProvider } from "@/components/SentryProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { KeyboardShortcutsModal } from "@/components/modals/KeyboardShortcuts";
+import { AIProvider } from "@/components/ai/AIProvider";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -41,6 +42,7 @@ export default function RootLayout({
             <AuthProvider>
               <Navbar />
               {children}
+              <AIProvider />
               <CommandPalette />
               <KeyboardShortcutsModal />
               <Toaster position="top-right" richColors />
