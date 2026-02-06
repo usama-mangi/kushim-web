@@ -148,7 +148,7 @@ export class EvidenceCollectionProcessor {
   async handleGitHubCollection(job: Job<EvidenceCollectionJobData>) {
     const { customerId, integrationId, controlId } = job.data;
     this.logger.log(
-      `Processing GitHub evidence collection for customer ${customerId}`,
+      `[GitHub Evidence] Processing for customer ${customerId}, control ${controlId}`,
     );
 
     try {
@@ -168,22 +168,33 @@ export class EvidenceCollectionProcessor {
         throw new Error(`Control ${controlId} not found`);
       }
 
+      this.logger.log(
+        `[GitHub Evidence] Collecting for control ${control.controlId} - ${control.title}`,
+      );
+
       let evidenceData: any;
       const config = this.decryptConfig(integration.config);
+      
+      this.logger.debug(
+        `[GitHub Evidence] Config has ${config.repos?.length || 0} repos configured`,
+      );
 
       switch (control.controlId) {
         case 'CC7.1.1': // IaC repos monitoring
         case 'CC8.1.2': // Branch protection / Peer review
+          this.logger.log(`[GitHub Evidence] Collecting branch protection evidence`);
           evidenceData =
             await this.githubService.collectBranchProtectionEvidence(config);
           break;
         case 'CC8.1.3': // CI/CD / Commit signing
+          this.logger.log(`[GitHub Evidence] Collecting commit signing evidence`);
           evidenceData =
             await this.githubService.collectCommitSigningEvidence(config);
           break;
         case 'CC7.2':
         case 'CC7.2.1': // SAST
         case 'CC7.2.2': // Dependabot
+          this.logger.log(`[GitHub Evidence] Collecting security evidence`);
           evidenceData =
             await this.githubService.collectSecurityEvidence(config);
           break;
@@ -195,6 +206,10 @@ export class EvidenceCollectionProcessor {
             await this.githubService.collectBranchProtectionEvidence(config);
       }
 
+      this.logger.log(
+        `[GitHub Evidence] Collected data with status: ${evidenceData.status}`,
+      );
+
       const savedEvidence = await this.storeEvidence(
         customerId,
         controlId,
@@ -203,13 +218,16 @@ export class EvidenceCollectionProcessor {
         String(job.id),
       );
 
-      this.logger.log(`GitHub evidence collected: ${savedEvidence.id}`);
+      this.logger.log(
+        `[GitHub Evidence] ✅ Saved evidence ${savedEvidence.id} for control ${control.controlId} with status ${evidenceData.status}`,
+      );
       return { success: true, jobId: job.id, evidenceId: savedEvidence.id };
     } catch (error) {
       this.logger.error(
-        `Failed GitHub evidence collection for job ${job.id}:`,
-        error,
+        `[GitHub Evidence] ❌ Failed for job ${job.id}:`,
+        error.message,
       );
+      this.logger.error(error.stack);
       throw error;
     }
   }

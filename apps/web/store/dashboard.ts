@@ -112,7 +112,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const totalControls = controls.length || 64; // Fallback to 64 if not loaded
       const passingControls = controls.filter(c => c.status === 'PASS').length;
       const failingControls = controls.filter(c => c.status === 'FAIL').length;
-      const warningControls = controls.filter(c => c.status === 'WARNING' || c.status === 'PENDING').length;
+      const warningControls = controls.filter(c => c.status === 'WARNING').length;
+      const pendingControls = controls.filter(c => c.status === 'PENDING').length;
       
       const overall = totalControls > 0 ? passingControls / totalControls : 0;
 
