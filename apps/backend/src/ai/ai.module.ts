@@ -11,6 +11,8 @@ import { AiOrchestratorService } from './integration/ai-orchestrator.service';
 import { AiOrchestratorController } from './integration/ai-orchestrator.controller';
 import { AiAnalyticsService } from './analytics/ai-analytics.service';
 import { AiAnalyticsController } from './analytics/ai-analytics.controller';
+import { InsightsService } from './insights/insights.service';
+import { InsightsController } from './insights/insights.controller';
 import { PrismaService } from '../shared/prisma/prisma.service';
 import { CacheService } from '../common/cache/cache.service';
 import aiConfig from './config/ai.config';
@@ -30,11 +32,13 @@ import aiConfig from './config/ai.config';
     EvidenceMappingService,
     AiOrchestratorService,
     AiAnalyticsService,
+    InsightsService,
   ],
   controllers: [
     EvidenceMappingController,
     AiOrchestratorController,
     AiAnalyticsController,
+    InsightsController,
   ],
   exports: [
     OpenAIService,
@@ -43,6 +47,7 @@ import aiConfig from './config/ai.config';
     EvidenceMappingService,
     AiOrchestratorService,
     AiAnalyticsService,
+    InsightsService,
     PolicyDraftingModule,
     CopilotModule,
   ],

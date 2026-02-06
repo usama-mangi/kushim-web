@@ -17,7 +17,7 @@ export function ComplianceTrends() {
         <CardDescription>Average health score over the last 7 days</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[200px] w-full flex items-center justify-center">
+        <div className="h-[280px] w-full flex items-center justify-center">
           {!hasData && !isLoading ? (
             <div className="text-center space-y-2">
               <p className="text-sm text-muted-foreground">Not enough data to calculate trends.</p>

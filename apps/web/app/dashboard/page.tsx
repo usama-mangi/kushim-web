@@ -82,7 +82,9 @@ export default function Home() {
   // Initial data fetch
   useEffect(() => {
     if (isAuthenticated) {
-      fetchDashboardData();
+      fetchDashboardData().catch(err => {
+        console.error("Dashboard fetch failed:", err);
+      });
     }
   }, [fetchDashboardData, isAuthenticated]);
 
@@ -91,7 +93,9 @@ export default function Home() {
     if (!isAuthenticated) return;
     
     const interval = setInterval(() => {
-      fetchDashboardData();
+      fetchDashboardData().catch(err => {
+        console.error("Auto-refresh failed:", err);
+      });
     }, refreshInterval);
 
     return () => clearInterval(interval);
@@ -193,13 +197,9 @@ export default function Home() {
 
         <div className="space-y-8">
           {/* Compliance Score Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
-              <ComplianceScore />
-            </div>
-            <div className="lg:col-span-2">
-              <ComplianceTrends />
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ComplianceScore />
+            <ComplianceTrends />
           </div>
 
           {/* Integration Health Section */}

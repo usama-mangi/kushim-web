@@ -99,6 +99,20 @@ export class AuthService {
       },
     });
 
+    // Assign default framework (SOC 2)
+    const soc2Framework = await this.prisma.frameworkModel.findFirst({
+      where: { code: 'SOC2' },
+    });
+
+    if (soc2Framework) {
+      await this.prisma.customerFramework.create({
+        data: {
+          customerId: customer.id,
+          frameworkId: soc2Framework.id,
+        },
+      });
+    }
+
     const newUser = await this.prisma.user.create({
       data: {
         email: user.email,

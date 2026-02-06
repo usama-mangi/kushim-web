@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { AIInsight } from '@/types/ai';
 import { X, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { apiClient } from '@/lib/api/client';
+import { useAIStore } from '@/store/ai';
 
 /**
  * Display smart AI-powered insights and suggestions
@@ -16,6 +19,8 @@ import { X, AlertCircle, Info, AlertTriangle } from 'lucide-react';
  * - Cost spikes
  */
 export function AIInsightsBanner() {
+  const router = useRouter();
+  const { setEvidenceMappingOpen, setPolicyDraftingOpen, setCopilotOpen } = useAIStore();
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [dismissedInsights, setDismissedInsights] = useState<Set<string>>(new Set());
 
@@ -25,16 +30,39 @@ export function AIInsightsBanner() {
 
   const fetchInsights = async () => {
     try {
-      const response = await fetch('/api/ai/insights');
-      const data = await response.json();
+      const data = await apiClient.get<AIInsight[]>('/ai/insights');
       setInsights(data);
     } catch (error) {
       console.error('Failed to fetch insights:', error);
+      // Silently fail - insights are optional enhancement
     }
   };
 
   const handleDismiss = (insight: AIInsight) => {
     setDismissedInsights(new Set([...dismissedInsights, insight.type]));
+  };
+
+  const handleAction = (insight: AIInsight) => {
+    switch (insight.type) {
+      case 'unmapped_evidence':
+        // Open evidence mapping dialog
+        setEvidenceMappingOpen(true);
+        break;
+      case 'control_gaps':
+        // Navigate to controls page to view failed controls
+        router.push('/controls');
+        break;
+      case 'pending_policies':
+        // Navigate to policies page
+        router.push('/policies');
+        break;
+      case 'ai_cost_spike':
+        // Open copilot to view AI analytics
+        setCopilotOpen(true);
+        break;
+      default:
+        console.warn('Unknown insight type:', insight.type);
+    }
   };
 
   const visibleInsights = insights.filter(
@@ -68,33 +96,27 @@ export function AIInsightsBanner() {
   };
 
   return (
-    <div className="space-y-3 mb-6">
+    <div className="space-y-3 mb-6 w-full">
       {visibleInsights.map((insight, index) => (
-        <Alert key={index} variant={getVariant(insight.severity)}>
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-3 flex-1">
-              {getIcon(insight.severity)}
-              <div className="flex-1">
-                <AlertTitle>{insight.title}</AlertTitle>
-                <AlertDescription className="mt-1">
-                  {insight.description}
-                </AlertDescription>
-                <div className="mt-2">
-                  <Button size="sm" variant="outline">
-                    {insight.actionRequired}
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDismiss(insight)}
-              className="ml-2"
-            >
-              <X className="h-4 w-4" />
+        <Alert key={index} variant={getVariant(insight.severity)} className="w-full relative">
+          {getIcon(insight.severity)}
+          <AlertTitle className="pr-8">{insight.title}</AlertTitle>
+          <AlertDescription className="pr-8">
+            {insight.description}
+          </AlertDescription>
+          <div className="col-start-2 mt-3">
+            <Button size="sm" variant="outline" onClick={() => handleAction(insight)}>
+              {insight.actionRequired}
             </Button>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleDismiss(insight)}
+            className="absolute top-3 right-3 h-6 w-6"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </Alert>
       ))}
     </div>

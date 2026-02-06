@@ -72,8 +72,8 @@ export function IntegrationCard({
                     <div className="space-y-2 text-sm text-muted-foreground">
                         <div className="flex justify-between">
                             <span>Health Score</span>
-                            <span className={healthScore && healthScore < 70 ? "text-red-500" : "text-green-500"}>
-                                {healthScore}%
+                            <span className={healthScore && healthScore < 0.7 ? "text-red-500" : "text-green-500"}>
+                                {healthScore !== undefined ? `${(healthScore * 100).toFixed(1)}%` : 'N/A'}
                             </span>
                         </div>
                         {lastSync && (

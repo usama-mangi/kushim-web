@@ -40,11 +40,47 @@ class ApiClient {
         // Log raw error for debugging
         console.error("[ApiClient] Raw API Error:", error);
 
-        // Handle errors globally
+        // Check if response exists and has data
+        let errorMessage = "An error occurred";
+        let statusCode = 500;
+
+        if (error?.response) {
+          statusCode = error.response.status;
+          
+          // Try to parse error message from response
+          const responseData = error.response.data;
+          
+          if (typeof responseData === 'string') {
+            // Response is HTML or plain text, not JSON
+            try {
+              const parsed = JSON.parse(responseData);
+              errorMessage = parsed.message || errorMessage;
+            } catch {
+              // Not JSON, use status text
+              errorMessage = error.response.statusText || errorMessage;
+            }
+          } else if (responseData && typeof responseData === 'object') {
+            // Response is already an object
+            errorMessage = responseData.message || errorMessage;
+          }
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+
+        // Handle specific status codes
+        if (statusCode === 401) {
+          errorMessage = "Please log in to continue";
+        } else if (statusCode === 404) {
+          errorMessage = "Resource not found";
+        } else if (statusCode === 500) {
+          errorMessage = "Server error, please try again later";
+        }
+
+        // Construct API error
         const apiError: ApiError = {
-          message: error?.response?.data?.message || error?.message || "An error occurred",
-          statusCode: error?.response?.status || 500,
-          error: error?.response?.data?.error,
+          message: errorMessage,
+          statusCode,
+          error: error?.response?.data?.error || error.code,
         };
 
         // Log constructed error

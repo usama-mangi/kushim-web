@@ -193,8 +193,29 @@ export class ComplianceCheckProcessor {
     this.logger.log(`Scheduling compliance checks for customer ${customerId}`);
 
     try {
-      const controls = await this.prisma.control.findMany();
+      // Get customer's active frameworks
+      const customerFrameworks = await this.prisma.customerFramework.findMany({
+        where: { customerId },
+        select: { frameworkId: true },
+      });
 
+      if (customerFrameworks.length === 0) {
+        this.logger.warn(`Customer ${customerId} has no active frameworks`);
+        return { success: false, message: 'No active frameworks found' };
+      }
+
+      const frameworkIds = customerFrameworks.map(cf => cf.frameworkId);
+
+      // Fetch controls for customer's frameworks
+      const controls = await this.prisma.control.findMany({
+        where: {
+          frameworkId: { in: frameworkIds },
+        },
+      });
+
+      this.logger.log(`Found ${controls.length} controls for customer ${customerId}`);
+
+      let scheduledCount = 0;
       for (const control of controls) {
         // Check if we need to run a check (e.g., based on last check)
         const lastCheck = await this.prisma.complianceCheck.findFirst({
@@ -211,12 +232,13 @@ export class ComplianceCheckProcessor {
             customerId,
             controlId: control.id,
           });
+          scheduledCount++;
           this.logger.debug(`Scheduled check for control ${control.controlId}`);
         }
       }
 
-      this.logger.log(`Scheduled compliance checks for job ${job.id}`);
-      return { success: true, jobId: job.id };
+      this.logger.log(`Scheduled ${scheduledCount} compliance checks for customer ${customerId}`);
+      return { success: true, jobId: job.id, scheduledCount };
     } catch (error) {
       this.logger.error(`Failed to schedule checks for job ${job.id}:`, error);
       throw error;
