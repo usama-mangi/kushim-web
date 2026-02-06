@@ -37,7 +37,8 @@ export async function forgotPassword(email: string): Promise<{ success: boolean;
 // ============================================================================
 
 export async function getControls(): Promise<any[]> {
-  return apiClient.get<any[]>("/compliance/controls");
+  const response = await apiClient.get<{ data: any[]; pagination: any }>("/compliance/controls");
+  return response.data || [];
 }
 
 export async function getControlDetails(id: string): Promise<any> {

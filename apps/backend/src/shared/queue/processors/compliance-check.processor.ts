@@ -65,7 +65,9 @@ export class ComplianceCheckProcessor {
   @Process(ComplianceCheckJobType.RUN_CHECK)
   async handleRunCheck(job: Job<ComplianceCheckJobData>) {
     const { customerId, controlId, evidenceId } = job.data;
-    this.logger.log(`Running compliance check for control ${controlId}`);
+    this.logger.log(
+      `[Compliance Check] Running for control ${controlId} (job ${job.id})`,
+    );
 
     try {
       // 1. Fetch control details
@@ -77,14 +79,20 @@ export class ComplianceCheckProcessor {
         throw new Error(`Control ${controlId} not found`);
       }
 
+      this.logger.log(
+        `[Compliance Check] Control: ${control.controlId} - ${control.title}`,
+      );
+
       // 2. Fetch evidence (specific ID or latest)
       let evidence;
       if (evidenceId) {
+        this.logger.debug(`[Compliance Check] Using specific evidence: ${evidenceId}`);
         evidence = await this.prisma.evidence.findUnique({
           where: { id: evidenceId },
           include: { integration: true },
         });
       } else {
+        this.logger.debug(`[Compliance Check] Finding latest evidence for control`);
         evidence = await this.prisma.evidence.findFirst({
           where: { customerId, controlId: control.id },
           orderBy: { collectedAt: 'desc' },
@@ -95,7 +103,7 @@ export class ComplianceCheckProcessor {
       if (!evidence) {
         // Trigger evidence collection if missing
         this.logger.warn(
-          `No evidence found for control ${controlId}, triggering collection`,
+          `[Compliance Check] No evidence found for control ${controlId}, triggering collection`,
         );
 
         // Find suitable integration for this control
@@ -131,9 +139,21 @@ export class ComplianceCheckProcessor {
         return { success: false, message: 'Evidence collection triggered' };
       }
 
+      this.logger.log(
+        `[Compliance Check] Found evidence ${evidence.id} collected at ${evidence.collectedAt}`,
+      );
+
       // 3. Evaluate Evidence
-      // The collectors return data with a 'status' field (PASS/FAIL)
+      // The collectors return data with a 'status' field (PASS/FAIL/WARNING)
       const evidenceData = evidence.data;
+      
+      if (!evidenceData.status) {
+        this.logger.error(
+          `[Compliance Check] Evidence ${evidence.id} missing status field. Data:`,
+          evidenceData,
+        );
+      }
+      
       const status: CheckStatus =
         evidenceData.status === 'PASS'
           ? CheckStatus.PASS
@@ -141,13 +161,21 @@ export class ComplianceCheckProcessor {
             ? CheckStatus.FAIL
             : CheckStatus.WARNING;
 
+      this.logger.log(
+        `[Compliance Check] Evidence status: ${evidenceData.status} → ${status}`,
+      );
+
       const errorMessage =
         status !== CheckStatus.PASS
-          ? `Compliance check failed based on evidence collected at ${evidence.collectedAt}`
+          ? `Compliance check ${status.toLowerCase()} based on evidence collected at ${evidence.collectedAt}`
           : null;
 
       // 4. Create ComplianceCheck Record
       const nextCheckAt = this.calculateNextCheck(control.frequency);
+
+      this.logger.debug(
+        `[Compliance Check] Creating ComplianceCheck record with status ${status}`,
+      );
 
       const complianceCheck = await this.prisma.complianceCheck.create({
         data: {
@@ -161,8 +189,15 @@ export class ComplianceCheckProcessor {
         },
       });
 
+      this.logger.log(
+        `[Compliance Check] ✅ Created ComplianceCheck ${complianceCheck.id} with status ${status}`,
+      );
+
       // 5. Handle Failure Remediation
       if (status === CheckStatus.FAIL) {
+        this.logger.log(
+          `[Compliance Check] Triggering remediation for failed control`,
+        );
         await this.handleRemediation(
           customerId,
           control,
@@ -173,7 +208,7 @@ export class ComplianceCheckProcessor {
       }
 
       this.logger.log(
-        `Completed compliance check for job ${job.id}. Status: ${status}`,
+        `[Compliance Check] ✅ Completed job ${job.id}. Status: ${status}, CheckId: ${complianceCheck.id}`,
       );
       return {
         success: true,
@@ -182,7 +217,11 @@ export class ComplianceCheckProcessor {
         checkId: complianceCheck.id,
       };
     } catch (error) {
-      this.logger.error(`Failed compliance check for job ${job.id}:`, error);
+      this.logger.error(
+        `[Compliance Check] ❌ Failed for job ${job.id}:`,
+        error.message,
+      );
+      this.logger.error(error.stack);
       throw error;
     }
   }

@@ -11,6 +11,7 @@ import { ControlStatus } from "@/components/dashboard/ControlStatus";
 import { RecentAlerts } from "@/components/dashboard/RecentAlerts";
 import { ComplianceTrends } from "@/components/dashboard/ComplianceTrends";
 import { AIInsightsBanner } from "@/components/ai/AIInsightsBanner";
+import { ComplianceGuidance } from "@/components/dashboard/ComplianceGuidance";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -64,6 +65,7 @@ export default function Home() {
   const { isAuthenticated } = useAuthStore();
   const [selectedFramework, setSelectedFramework] = useState("SOC2");
   const {
+    complianceScore,
     fetchDashboardData,
     isRefreshing,
     error,
@@ -194,6 +196,16 @@ export default function Home() {
 
         {/* AI Insights Banner */}
         <AIInsightsBanner />
+
+        {/* Compliance Guidance */}
+        {complianceScore && (
+          <ComplianceGuidance
+            passingControls={complianceScore.passingControls}
+            failingControls={complianceScore.failingControls}
+            warningControls={complianceScore.warningControls}
+            totalControls={complianceScore.totalControls}
+          />
+        )}
 
         <div className="space-y-8">
           {/* Compliance Score Section */}

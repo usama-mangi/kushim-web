@@ -14,8 +14,6 @@ build/
 out/
 
 # Environment
-.env
-.env.local
 .env.development.local
 .env.test.local
 .env.production.local
@@ -35,7 +33,6 @@ lerna-debug.log*
 Thumbs.db
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -58,3 +55,4 @@ backups/
 
 # Docker
 docker-compose.override.yml
+config.bat

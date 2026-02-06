@@ -132,9 +132,7 @@ export function ComplianceScore() {
         </div>
 
         {/* Connect Integrations or Run Scan CTA */}
-        {complianceScore.passingControls === 0 && 
-         complianceScore.warningControls === 0 && 
-         complianceScore.failingControls === 0 && (
+        {complianceScore.passingControls === 0 && (
           <div className="pt-4 border-t space-y-2">
             {!hasIntegrations ? (
               <Link href="/integrations" className="block w-full">
@@ -143,7 +141,7 @@ export function ComplianceScore() {
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
-            ) : (
+            ) : complianceScore.warningControls === 0 && complianceScore.failingControls === 0 ? (
               <>
                 <p className="text-xs text-muted-foreground text-center">
                   Run a compliance scan to check your controls
@@ -161,6 +159,18 @@ export function ComplianceScore() {
                   Run Compliance Scan
                 </Button>
               </>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-warning font-medium text-center">
+                  Some controls need attention to improve compliance score
+                </p>
+                <Link href="/controls" className="block w-full">
+                  <Button className="w-full group" variant="outline">
+                    View Control Details
+                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </Link>
+              </div>
             )}
           </div>
         )}
